@@ -2,6 +2,7 @@
 using System.IO;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Xml.Serialization.Configuration;
 using Newtonsoft.Json;
 
 namespace Drunkcod.Safenet
@@ -53,5 +54,33 @@ namespace Drunkcod.Safenet
 		public Stream Body;
 		public MediaTypeHeaderValue ContentType;
 		public ContentRangeHeaderValue ContentRange;
+		public byte[] Metadata;
+	}
+
+	public struct SafenetEmptyResponse { }
+
+	public class SafenetDnsRegisterServiceRequest
+	{
+		[JsonProperty("longName")] public string LongName;
+		[JsonProperty("serviceName")] public string ServiceName;
+		[JsonProperty("rootPath")] public string RootPath;
+		[JsonProperty("serviceHomeDirPath")] public string ServiceHomeDirPath;
+	}
+
+	public class SafenetNfsCreateDirectoryRequest
+	{
+		public string RootPath;
+		public string DirectoryPath;
+		public bool IsPrivate;
+		public string Metadata = string.Empty;
+	}
+
+	public class SafenetNfsPutFileRequest
+	{
+		public string RootPath;
+		public string FilePath;
+		public MediaTypeHeaderValue ContentType;
+		public byte[] Metadata = new byte[0];
+		public byte[] Bytes;
 	}
 }
