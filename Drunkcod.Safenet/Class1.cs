@@ -1,19 +1,19 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.IO;
 using System.Net;
+using System.Net.Http.Headers;
 using Newtonsoft.Json;
 
 namespace Drunkcod.Safenet
 {
 	public class SafenetResponse<T>
 	{
-		public HttpStatusCode StatusCode;
 		public T Result;
-		public SafenetError Error;
+		public SafenetError? Error;
+		public HttpStatusCode StatusCode;
 	}
 
-	public class SafenetError
+	public struct SafenetError
 	{
 		[JsonProperty("errorCode")] public int ErrorCode;
 		[JsonProperty("description")] public string Description;
@@ -45,4 +45,13 @@ namespace Drunkcod.Safenet
 		[JsonProperty("metadata")] public string Metadata;
 	}
 
+	public class SafenetFileResponse
+	{
+		public DateTime CreatedOn;
+		public DateTime ModifiedOn;
+		public long? ContentLength;
+		public Stream Body;
+		public MediaTypeHeaderValue ContentType;
+		public ContentRangeHeaderValue ContentRange;
+	}
 }
