@@ -1,0 +1,5 @@
+Artifacts/
+Build/
+packages/
+*.swp
+*.suo
