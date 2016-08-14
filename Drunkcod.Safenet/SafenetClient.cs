@@ -36,10 +36,8 @@ namespace Drunkcod.Safenet
 		public Task<SafenetResponse<SafenetDirectoryResponse>> DnsGetAsync(string service, string longName) =>
 			MakeResponseAsync<SafenetDirectoryResponse>(http.GetAsync($"/dns/{service}/{longName}"));
 
-		public Task<SafenetResponse<SafenetFileResponse>> DnsGetAsync(string service, string longName, string path) {
-			var request = http.GetAsync($"/dns/{service}/{longName}/{WebUtility.UrlEncode(path)}");
-			return MakeFileResponse(request);
-		}
+		public Task<SafenetResponse<SafenetFileResponse>> DnsGetAsync(string service, string longName, string path) =>
+			MakeFileResponse(http.GetAsync($"/dns/{service}/{longName}/{WebUtility.UrlEncode(path)}"));
 
 		public Task<SafenetResponse<SafenetFileResponse>> DnsGetAsync(string service, string longName, string path, RangeHeaderValue range) {
 			var rm = new HttpRequestMessage(HttpMethod.Get, $"/dns/{service}/{longName}/{WebUtility.UrlEncode(path)}");
@@ -56,10 +54,8 @@ namespace Drunkcod.Safenet
 		public Task<SafenetResponse<SafenetEmptyResponse>> DnsPutAsync(SafenetDnsRegisterServiceRequest service) =>
 			EmptyResponseAsync(http.PutAsync("/dns", ToPayload(service)));
 
-		public Task<SafenetResponse<SafenetFileResponse>> NfsGetFileAsync(string rootPath, string filePath) {
-			var request = http.GetAsync($"/nfs/file/{rootPath}/{WebUtility.UrlEncode(filePath)}");
-			return MakeFileResponse(request);
-		} 
+		public Task<SafenetResponse<SafenetFileResponse>> NfsGetFileAsync(string rootPath, string filePath) => 
+			MakeFileResponse(http.GetAsync($"/nfs/file/{rootPath}/{WebUtility.UrlEncode(filePath)}")); 
 
 		public Task<SafenetResponse<SafenetEmptyResponse>> NfsPostAsync(SafenetNfsCreateDirectoryRequest directory) =>
 			EmptyResponseAsync(http.PostAsync($"/nfs/directory/{directory.RootPath}/{directory.DirectoryPath}", ToPayload(new {
@@ -93,8 +89,7 @@ namespace Drunkcod.Safenet
 					Body = await r.Content.ReadAsStreamAsync()
 				};
 			else
-				using (var jr = new JsonTextReader(new StreamReader(await r.Content.ReadAsStreamAsync())))
-					response.Error = json.Deserialize<SafenetError>(jr);
+				response.Error = Deserialize<SafenetError>(await r.Content.ReadAsStreamAsync());
 			return response;
 		}
 
@@ -109,20 +104,24 @@ namespace Drunkcod.Safenet
 			var r = await request;
 			var response = new SafenetResponse<SafenetEmptyResponse> {StatusCode = r.StatusCode};
 			if (!r.IsSuccessStatusCode)
-				using (var jr = new JsonTextReader(new StreamReader(await r.Content.ReadAsStreamAsync())))
-					response.Error = json.Deserialize<SafenetError>(jr);
+					response.Error = Deserialize<SafenetError>(await r.Content.ReadAsStreamAsync());
 			return response;
 		}
 
 		async Task<SafenetResponse<T>> MakeResponseAsync<T>(Task<HttpResponseMessage> request) {
 			var r = await request;
 			var response = new SafenetResponse<T> {StatusCode = r.StatusCode};
-			using (var jr = new JsonTextReader(new StreamReader(await r.Content.ReadAsStreamAsync())))
-				if (r.IsSuccessStatusCode)
-					response.Result = json.Deserialize<T>(jr);
-				else
-					response.Error = json.Deserialize<SafenetError>(jr);
+			var body = await r.Content.ReadAsStreamAsync();
+			if (r.IsSuccessStatusCode)
+				response.Result = Deserialize<T>(body);
+			else
+				response.Error = Deserialize<SafenetError>(body);
 			return response;
+		}
+
+		T Deserialize<T>(Stream body) {
+			using(var jr = new JsonTextReader(new StreamReader(body)))
+				return json.Deserialize<T>(jr);
 		}
 	
 		HttpContent ToPayload(object obj) =>
