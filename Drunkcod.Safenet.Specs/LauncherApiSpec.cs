@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using System.Web.Http;
 using System.Web.Http.Dependencies;
@@ -32,18 +33,33 @@ namespace Drunkcod.Safenet.Simulator
 		}
 
 		[HttpGet, Route("auth")]
-		public HttpResponseMessage GetAuth() {
-			var auth = Request.Headers.Authorization;
-			if (auth != null && auth.Scheme == "Bearer" && knownTokens.Contains(auth.Parameter))
+		public HttpResponseMessage AuthGet() {
+			if (IsAuthorized(Request.Headers.Authorization))
 				return new HttpResponseMessage(HttpStatusCode.OK);
 			return new HttpResponseMessage(HttpStatusCode.Unauthorized);
 		}
 
 		[HttpPost, Route("auth")]
-		public object PostAuth() {
+		public object AuthPost() {
 			var token = Guid.NewGuid().ToString();
 			knownTokens.Add(token);
 			return new { token };
+		}
+
+		[HttpDelete, Route("auth")]
+		public HttpResponseMessage AuthDelete()
+		{
+			var auth = Request.Headers.Authorization;
+			if (IsAuthorized(auth)) {
+				knownTokens.Remove(auth.Parameter);
+				return new HttpResponseMessage(HttpStatusCode.OK);
+			}
+			return new HttpResponseMessage(HttpStatusCode.Unauthorized);
+		}
+
+		private bool IsAuthorized(AuthenticationHeaderValue auth)
+		{
+			return auth != null && auth.Scheme == "Bearer" && knownTokens.Contains(auth.Parameter);
 		}
 	}
 }
@@ -140,26 +156,37 @@ namespace Drunkcod.Safenet.Specs
 			safe = new SafenetClient(ApiBaseAddress);
 		}
 
-		public void get_auth_without_token_is_unauthorized() {
+		public void auth_without_token_is_unauthorized() {
 			Check.That(() => safe.AuthGetAsync().Result.StatusCode == HttpStatusCode.Unauthorized);
 		}
 
-		public async Task can_check_token_validity() {
-			var auth = await safe.AuthPostAsync(new SafenetAuthRequest
-			{
-				App = new SafenetAppInfo
-				{
-					Id = "TestApp",
-					Name = "Testing",
-					Vendor = "Test Inc",
-					Version = "0.0.0.1"
-				}
-			});
+		public async Task auth_check_token_validity() {
+			var auth = await safe.AuthPostAsync(MakeTestAppAuthRequest());
 			Check.That(
 				() => auth.StatusCode == HttpStatusCode.OK,
 				() => !string.IsNullOrEmpty(auth.Response.Token));
 			safe.SetToken(auth.Response.Token);
 			Check.That(() => safe.AuthGetAsync().Result.StatusCode == HttpStatusCode.OK);
 		}
+
+		public async Task auth_expire_token() {
+			var auth = await safe.AuthPostAsync(MakeTestAppAuthRequest());
+			Check.That(
+				() => auth.StatusCode == HttpStatusCode.OK,
+				() => !string.IsNullOrEmpty(auth.Response.Token));
+			safe.SetToken(auth.Response.Token);
+			Check.That(() => safe.AuthDeleteAsync().Result.StatusCode == HttpStatusCode.OK);
+			Check.That(() => safe.AuthGetAsync().Result.StatusCode == HttpStatusCode.Unauthorized);
+		}
+
+		private static SafenetAuthRequest MakeTestAppAuthRequest() =>
+			new SafenetAuthRequest {
+				App = new SafenetAppInfo {
+					Id = "TestApp",
+					Name = "Testing",
+					Vendor = "Test Inc",
+					Version = "0.0.0.1"
+				}
+			};
 	}
 }
