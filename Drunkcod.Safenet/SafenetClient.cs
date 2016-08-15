@@ -113,7 +113,7 @@ namespace Drunkcod.Safenet
 
 		private async Task SetError<T>(SafenetResponse<T> response, HttpResponseMessage r)
 		{
-			response.Error = r.Content.Headers.ContentType.MediaType == "application/json"
+			response.Error = r.Content.Headers.ContentType?.MediaType == "application/json"
 				? Deserialize<SafenetError>(await r.Content.ReadAsStreamAsync())
 				: new SafenetError {Description = await r.Content.ReadAsStringAsync()};
 		}
