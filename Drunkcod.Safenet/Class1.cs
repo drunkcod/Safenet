@@ -2,22 +2,41 @@
 using System.IO;
 using System.Net;
 using System.Net.Http.Headers;
-using System.Xml.Serialization.Configuration;
 using Newtonsoft.Json;
 
 namespace Drunkcod.Safenet
 {
 	public class SafenetResponse<T>
 	{
-		public T Result;
+		public T Response;
 		public SafenetError? Error;
 		public HttpStatusCode StatusCode;
 	}
 
 	public struct SafenetError
 	{
-		[JsonProperty("errorCode")] public int ErrorCode;
 		[JsonProperty("description")] public string Description;
+		[JsonProperty("errorCode")] public int? ErrorCode;
+	}
+
+	public class SafenetAuthResponse
+	{
+		[JsonProperty("token")] public string Token;
+		[JsonProperty("permissions")] public string[] Permissions;
+	}
+
+	public class SafenetAppInfo
+	{
+		[JsonProperty("name")] public string Name;
+		[JsonProperty("id")] public string Id;
+		[JsonProperty("version")] public string Version;
+		[JsonProperty("vendor")] public string Vendor;
+	}
+
+	public class SafenetAuthRequest
+	{
+		[JsonProperty("app")] public SafenetAppInfo App;
+		[JsonProperty("permissions")] public string[] Permissions = new string[0];
 	}
 
 	public class SafenetDirectoryResponse
@@ -72,7 +91,7 @@ namespace Drunkcod.Safenet
 		public string RootPath;
 		public string DirectoryPath;
 		public bool IsPrivate;
-		public string Metadata = string.Empty;
+		public byte[] Metadata = new byte[0];
 	}
 
 	public class SafenetNfsPutFileRequest
