@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Drunkcod.Safenet", "Drunkco
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Drunkcod.Safenet.Specs", "Drunkcod.Safenet.Specs\Drunkcod.Safenet.Specs.csproj", "{B62E61FE-45A8-46D4-B738-950F7195F3AD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Drunkcod.Safenet.Simulator", "Drunkcod.Safenet.Simulator\Drunkcod.Safenet.Simulator.csproj", "{7538D2C8-303E-4497-A6EA-1CA2A07B4F7D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{B62E61FE-45A8-46D4-B738-950F7195F3AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B62E61FE-45A8-46D4-B738-950F7195F3AD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B62E61FE-45A8-46D4-B738-950F7195F3AD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7538D2C8-303E-4497-A6EA-1CA2A07B4F7D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7538D2C8-303E-4497-A6EA-1CA2A07B4F7D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7538D2C8-303E-4497-A6EA-1CA2A07B4F7D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7538D2C8-303E-4497-A6EA-1CA2A07B4F7D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,68 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using System.Web.Http;
 using System.Web.Http.Dependencies;
 using Cone;
 using Drunkcod.Safenet.Simulator;
+using Drunkcod.Safenet.Simulator.Controllers;
 using Microsoft.Owin.Hosting;
-using Owin;
-
-namespace Drunkcod.Safenet.Simulator
-{
-	public class SafeSimStartup
-	{
-		public void Configure(IAppBuilder appBuilder, HttpConfiguration config)
-		{
-			config.MapHttpAttributeRoutes();
-			appBuilder.UseWebApi(config);
-		}
-	}
-
-	public class LauncherApiController : ApiController
-	{
-		readonly HashSet<string> knownTokens;
-
-		public LauncherApiController(HashSet<string> knownTokens)
-		{
-			this.knownTokens = knownTokens;
-		}
-
-		[HttpGet, Route("auth")]
-		public HttpResponseMessage AuthGet() {
-			if (IsAuthorized(Request.Headers.Authorization))
-				return new HttpResponseMessage(HttpStatusCode.OK);
-			return new HttpResponseMessage(HttpStatusCode.Unauthorized);
-		}
-
-		[HttpPost, Route("auth")]
-		public object AuthPost() {
-			var token = Guid.NewGuid().ToString();
-			knownTokens.Add(token);
-			return new { token };
-		}
-
-		[HttpDelete, Route("auth")]
-		public HttpResponseMessage AuthDelete()
-		{
-			var auth = Request.Headers.Authorization;
-			if (IsAuthorized(auth)) {
-				knownTokens.Remove(auth.Parameter);
-				return new HttpResponseMessage(HttpStatusCode.OK);
-			}
-			return new HttpResponseMessage(HttpStatusCode.Unauthorized);
-		}
-
-		private bool IsAuthorized(AuthenticationHeaderValue auth)
-		{
-			return auth != null && auth.Scheme == "Bearer" && knownTokens.Contains(auth.Parameter);
-		}
-	}
-}
 
 namespace Drunkcod.Safenet.Specs
 {
