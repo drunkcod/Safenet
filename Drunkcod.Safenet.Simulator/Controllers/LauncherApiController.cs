@@ -11,8 +11,7 @@ namespace Drunkcod.Safenet.Simulator.Controllers
 	{
 		readonly HashSet<string> knownTokens;
 
-		public LauncherApiController(HashSet<string> knownTokens)
-		{
+		public LauncherApiController(HashSet<string> knownTokens) {
 			this.knownTokens = knownTokens;
 		}
 
@@ -31,8 +30,7 @@ namespace Drunkcod.Safenet.Simulator.Controllers
 		}
 
 		[HttpDelete, Route("auth")]
-		public HttpResponseMessage AuthDelete()
-		{
+		public HttpResponseMessage AuthDelete() {
 			var auth = Request.Headers.Authorization;
 			if (IsAuthorized(auth)) {
 				knownTokens.Remove(auth.Parameter);
@@ -41,9 +39,7 @@ namespace Drunkcod.Safenet.Simulator.Controllers
 			return new HttpResponseMessage(HttpStatusCode.Unauthorized);
 		}
 
-		private bool IsAuthorized(AuthenticationHeaderValue auth)
-		{
-			return auth != null && auth.Scheme == "Bearer" && knownTokens.Contains(auth.Parameter);
-		}
+		private bool IsAuthorized(AuthenticationHeaderValue auth) =>
+			auth != null && auth.Scheme == "Bearer" && knownTokens.Contains(auth.Parameter);
 	}
 }
