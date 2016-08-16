@@ -19,7 +19,7 @@ namespace Drunkcod.Safenet.Simulator
 		};
 
 		public SafenetInMemoryDirectory GetOrCreateDirectory(string path) {
-			var parts = path.Split('/', '\\');
+			var parts = path.Split(new [] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
 			var dir = root;
 			for(var i = 0; i != parts.Length; ++i)
 				dir = dir.GetOrCreateDirectory(parts[i]);
@@ -32,9 +32,11 @@ namespace Drunkcod.Safenet.Simulator
 	public class SafenetInMemoryDirectory
 	{
 		readonly ConcurrentDictionary<string, SafenetInMemoryDirectory> directories = new ConcurrentDictionary<string, SafenetInMemoryDirectory>();
+		readonly ConcurrentDictionary<string, SafenetInMemorFile> files = new ConcurrentDictionary<string, SafenetInMemorFile>();
+
 		public SafenetDirectoryInfo Info;
 		public IEnumerable<SafenetInMemoryDirectory> SubDirectories => directories.Values;
-		public List<SafenetInMemorFile> Files = new List<SafenetInMemorFile>();
+		public IEnumerable<SafenetInMemorFile> Files => files.Values;
 
 		public SafenetInMemoryDirectory GetOrCreateDirectory(string path) {
 			return directories.GetOrAdd(path, _ => new SafenetInMemoryDirectory
@@ -49,9 +51,17 @@ namespace Drunkcod.Safenet.Simulator
 			});
 		}
 
+		public bool TryCreateFile(SafenetInMemorFile file) =>
+			files.AddOrUpdate(file.Name, _ => file, (_,x) => x) == file;
+	
+		public bool DeleteFile(string name) {
+			SafenetInMemorFile found;
+			return files.TryRemove(name, out found);
+		}
+
 		public void Clear() {
 			directories.Clear();
-			Files.Clear();
+			files.Clear();
 		}
 	}
 

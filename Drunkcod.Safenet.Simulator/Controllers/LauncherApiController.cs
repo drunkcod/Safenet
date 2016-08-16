@@ -90,23 +90,23 @@ namespace Drunkcod.Safenet.Simulator.Controllers
 		[HttpPost, Route("nfs/file/{root}/{*path}")]
 		public async Task<HttpResponseMessage> NfsPutFileAsync(string root, string path) {
 			var targetDir = fs.GetOrCreateDirectory(Path.Combine(root, Path.GetDirectoryName(path)));
-			targetDir.Files.Add(new SafenetInMemorFile {
+			if(targetDir.TryCreateFile(new SafenetInMemorFile {
 				Name = Path.GetFileName(path),
 				MediaType = Request.Content.Headers.ContentType,
 				CreatedOn = DateTime.UtcNow,
 				ModifiedOn = DateTime.UtcNow,
 				Bytes = await Request.Content.ReadAsByteArrayAsync()
-			});
-			return new HttpResponseMessage(HttpStatusCode.OK);
+			}))
+				return new HttpResponseMessage(HttpStatusCode.OK);
+			return new HttpResponseMessage(HttpStatusCode.BadRequest);
 		}
 
 		[HttpDelete, Route("nfs/file/{root}/{*path}")]
 		public HttpResponseMessage NfsDeleteFile(string root, string path) {
 			var targetDir = fs.GetOrCreateDirectory(Path.Combine(root,Path.GetDirectoryName(path)));
-			var found = targetDir.Files.FindIndex(x => x.Name == Path.GetFileName(path));
-			if(found == -1)
+			
+			if(!targetDir.DeleteFile(Path.GetFileName(path)))
 				return new HttpResponseMessage(HttpStatusCode.NotFound);
-			targetDir.Files.RemoveAt(found);
 			return new HttpResponseMessage(HttpStatusCode.OK);
 		}
 

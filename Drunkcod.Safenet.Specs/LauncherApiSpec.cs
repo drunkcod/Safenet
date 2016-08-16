@@ -146,6 +146,22 @@ namespace Drunkcod.Safenet.Specs
 			);
 		}
 
+		public async Task nfs_upload_file_bad_request_if_exists() {
+			await Authorize();
+			Check.That(() => safe.NfsPostAsync(TextFile()).Result.StatusCode == HttpStatusCode.OK);
+			Check.That(() => safe.NfsPostAsync(TextFile()).Result.StatusCode == HttpStatusCode.BadRequest);
+		}
+
+		private static SafenetNfsPutFileRequest TextFile()
+		{
+			return new SafenetNfsPutFileRequest {
+				RootPath = "app",
+				FilePath = "test.txt",
+				ContentType = MediaTypeHeaderValue.Parse("text/plain"),
+				Bytes = Encoding.UTF8.GetBytes("Hello World")
+			};
+		}
+
 		public async Task nfs_delete_file() {
 			await Authorize();
 			Check.That(() => safe.NfsPostAsync(new SafenetNfsPutFileRequest {
