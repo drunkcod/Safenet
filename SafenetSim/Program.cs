@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Web.Http;
 using Drunkcod.Safenet.Simulator;
@@ -29,9 +30,11 @@ namespace SafenetSim
 		}
 
 		static Func<IDictionary<string,object>,Task> Log(Func<IDictionary<string,object>,Task> next) {
-			return env => {
-				Console.WriteLine($"{env["owin.RequestMethod"]} {env["owin.RequestPath"]}");
-				return next(env);
+			return async env => {
+				var time = Stopwatch.StartNew();
+				Console.Write($"{env["owin.RequestMethod"]} {env["owin.RequestPath"]}");
+				await next(env);
+				Console.WriteLine($" {env["owin.ResponseStatusCode"]} in {time.Elapsed}");
 			};
 		}
 	}

@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
 using System.Threading.Tasks;
 using System.Web.Http;
 using Cone;
@@ -41,6 +44,7 @@ namespace Drunkcod.Safenet.Specs
 		[BeforeEach]
 		public void NewSafenetClient() {
 			safe = new SafenetClient(ApiBaseAddress);
+			fs.Clear();
 		}
 
 		public void auth_without_token_is_unauthorized() {
@@ -97,7 +101,46 @@ namespace Drunkcod.Safenet.Specs
 				x => x.StatusCode == HttpStatusCode.OK,
 				x => x.Response.Info.Name == "test",
 				x => x.Response.Info.IsPrivate == false);
+		}
 
+		public async Task nfs_upload_file() {
+			await Authorize();
+			Check.That(() => safe.NfsPostAsync(new SafenetNfsPutFileRequest {
+				RootPath = "app",
+				FilePath = "test.txt",
+				ContentType = MediaTypeHeaderValue.Parse("text/plain"),
+				Bytes = Encoding.UTF8.GetBytes("Hello World")
+			}).Result.StatusCode == HttpStatusCode.OK);
+
+			Check.With(() => safe.NfsGetDirectoryAsync("app", "").Result)
+			.That(
+				x => x.StatusCode == HttpStatusCode.OK,
+				x => x.Response.Files.Any(file => file.Name == "test.txt"),
+				x => x.Response.Files.Single(file => file.Name == "test.txt").Size == 11,
+				x => x.Response.Files.All(file => file.CreatedOn != default(DateTime)));
+			
+			var theFile = await safe.NfsGetFileAsync("app", "test.txt");
+			Check.With(() => theFile)
+			.That(
+				x => x.StatusCode == HttpStatusCode.OK,
+				file => file.Response.ContentType == MediaTypeHeaderValue.Parse("text/plain"),
+				file => file.Response.ContentLength == 11,
+				file => file.Response.CreatedOn != default(DateTime),
+				file => new StreamReader(file.Response.Body).ReadToEnd() == "Hello World"
+			);
+		}
+
+		public async Task nfs_delete_file() {
+			await Authorize();
+			Check.That(() => safe.NfsPostAsync(new SafenetNfsPutFileRequest {
+				RootPath = "app",
+				FilePath = "test.txt",
+				ContentType = MediaTypeHeaderValue.Parse("text/plain"),
+				Bytes = Encoding.UTF8.GetBytes("Hello World")
+			}).Result.StatusCode == HttpStatusCode.OK);
+
+			Check.That(() => safe.NfsDeleteFileAsync("app", "test.txt").Result.StatusCode == HttpStatusCode.OK);
+			Check.That(() => safe.NfsGetFileAsync("app", "test.txt").Result.StatusCode == HttpStatusCode.NotFound);
 		}
 
 		private async Task Authorize() {
