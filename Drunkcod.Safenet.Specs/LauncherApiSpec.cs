@@ -120,13 +120,13 @@ namespace Drunkcod.Safenet.Specs
 				x => x.Response.Files.All(file => file.CreatedOn != default(DateTime)));
 			
 			var theFile = await safe.NfsGetFileAsync("app", "test.txt");
-			Check.With(() => theFile)
+			Check.That(() => theFile.StatusCode == HttpStatusCode.OK);
+			Check.With(() => theFile.Response)
 			.That(
-				x => x.StatusCode == HttpStatusCode.OK,
-				file => file.Response.ContentType == MediaTypeHeaderValue.Parse("text/plain"),
-				file => file.Response.ContentLength == 11,
-				file => file.Response.CreatedOn != default(DateTime),
-				file => new StreamReader(file.Response.Body).ReadToEnd() == "Hello World"
+				file => file.ContentType == MediaTypeHeaderValue.Parse("text/plain"),
+				file => file.ContentLength == 11,
+				file => file.CreatedOn != default(DateTime),
+				file => new StreamReader(file.Body).ReadToEnd() == "Hello World"
 			);
 		}
 
@@ -141,6 +141,11 @@ namespace Drunkcod.Safenet.Specs
 
 			Check.That(() => safe.NfsDeleteFileAsync("app", "test.txt").Result.StatusCode == HttpStatusCode.OK);
 			Check.That(() => safe.NfsGetFileAsync("app", "test.txt").Result.StatusCode == HttpStatusCode.NotFound);
+		}
+
+		public async Task nfs_delete_missing_file_is_not_found() {
+			await Authorize();
+			Check.That(() => safe.NfsDeleteFileAsync("app", "no-such.file").Result.StatusCode == HttpStatusCode.NotFound);
 		}
 
 		private async Task Authorize() {

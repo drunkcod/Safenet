@@ -52,7 +52,7 @@ namespace Drunkcod.Safenet.Simulator.Controllers
 		[HttpGet, Route("nfs/directory/{root}/{directory?}")]
 		public SafenetDirectoryResponse NfsGetDirectory(string root, string directory = "") {
 			Authorize();
-			var dir = fs.GetOrCreateDirectory(directory);
+			var dir = fs.GetOrCreateDirectory(Path.Combine(root, directory));
 			return new SafenetDirectoryResponse {
 				Info = dir.Info,
 				SubDirectories = dir.SubDirectories.Select(x => x.Info).ToArray(),
@@ -65,20 +65,16 @@ namespace Drunkcod.Safenet.Simulator.Controllers
 			};
 		}
 
-		[HttpPost, Route("nfs/directory/{root}/{directory}")]
+		[HttpPost, Route("nfs/directory/{root}/{*directory}")]
 		public HttpResponseMessage NfsCreateDirectory(string root, string directory, [FromBody] SafenetNfsCreateDirectoryRequest dir) {
-			var rootDir = fs.GetOrCreateDirectory(string.Empty);
-			var newDir = fs.GetOrCreateDirectory(directory);
+			var newDir = fs.GetOrCreateDirectory(Path.Combine(root, directory));
 			newDir.Info.IsPrivate = dir.IsPrivate;
-			rootDir.SubDirectories.Add(new SafenetInMemoryDirectory {
-				Info = newDir.Info
-			});
 			return new HttpResponseMessage(HttpStatusCode.OK);
 		}
 
 		[HttpGet, Route("nfs/file/{root}/{*path}")]
 		public HttpResponseMessage NfsGetFile(string root, string path) {
-			var sourceDir = fs.GetOrCreateDirectory(Path.GetDirectoryName(path));
+			var sourceDir = fs.GetOrCreateDirectory(Path.Combine(root, Path.GetDirectoryName(path)));
 			var file = sourceDir.Files.SingleOrDefault(x => x.Name == Path.GetFileName(path));
 			if(file == null)
 				return new HttpResponseMessage(HttpStatusCode.NotFound);
@@ -93,7 +89,7 @@ namespace Drunkcod.Safenet.Simulator.Controllers
 
 		[HttpPost, Route("nfs/file/{root}/{*path}")]
 		public async Task<HttpResponseMessage> NfsPutFileAsync(string root, string path) {
-			var targetDir = fs.GetOrCreateDirectory(Path.GetDirectoryName(path));
+			var targetDir = fs.GetOrCreateDirectory(Path.Combine(root, Path.GetDirectoryName(path)));
 			targetDir.Files.Add(new SafenetInMemorFile {
 				Name = Path.GetFileName(path),
 				MediaType = Request.Content.Headers.ContentType,
@@ -106,8 +102,11 @@ namespace Drunkcod.Safenet.Simulator.Controllers
 
 		[HttpDelete, Route("nfs/file/{root}/{*path}")]
 		public HttpResponseMessage NfsDeleteFile(string root, string path) {
-			var targetDir = fs.GetOrCreateDirectory(Path.GetDirectoryName(path));
-			targetDir.Files.RemoveAt(targetDir.Files.FindIndex(x => x.Name == Path.GetFileName(path)));
+			var targetDir = fs.GetOrCreateDirectory(Path.Combine(root,Path.GetDirectoryName(path)));
+			var found = targetDir.Files.FindIndex(x => x.Name == Path.GetFileName(path));
+			if(found == -1)
+				return new HttpResponseMessage(HttpStatusCode.NotFound);
+			targetDir.Files.RemoveAt(found);
 			return new HttpResponseMessage(HttpStatusCode.OK);
 		}
 

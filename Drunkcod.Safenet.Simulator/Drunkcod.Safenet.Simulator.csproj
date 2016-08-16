@@ -74,6 +74,7 @@
   <ItemGroup>
     <Compile Include="Controllers\LauncherApiController.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SafenetInMemoryFileSystem.cs" />
     <Compile Include="SafenetSimStartup.cs" />
     <Compile Include="SimpleDependencyResolver.cs" />
   </ItemGroup>
