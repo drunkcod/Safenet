@@ -42,8 +42,8 @@ namespace Drunkcod.Safenet
 	public class SafenetDirectoryResponse
 	{
 		[JsonProperty("info")] public SafenetDirectoryInfo Info;
-		[JsonProperty("files")] public SafenetFileInfo[] Files;
-		[JsonProperty("subDirectories")] public object[] SubDirectories;
+		[JsonProperty("files")] public SafenetFileInfo[] Files = new SafenetFileInfo[0];
+		[JsonProperty("subDirectories")] public SafenetDirectoryInfo[] SubDirectories = new SafenetDirectoryInfo[0];
 	}
 
 	public class SafenetDirectoryInfo

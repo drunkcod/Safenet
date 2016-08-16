@@ -80,6 +80,12 @@
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Drunkcod.Safenet\Drunkcod.Safenet.csproj">
+      <Project>{D59D27FA-6834-4C8F-933E-B9BF447CB22A}</Project>
+      <Name>Drunkcod.Safenet</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

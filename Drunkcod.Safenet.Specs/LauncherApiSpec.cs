@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using System.Web.Http;
@@ -18,14 +19,16 @@ namespace Drunkcod.Safenet.Specs
 		SafenetClient safe;
 
 		SimpleDependencyResolver deps;
-		HashSet<string> knownTokens = new HashSet<string>();
+
+		readonly HashSet<string> knownTokens = new HashSet<string>();
+		readonly SafenetInMemoryFileSystem fs = new SafenetInMemoryFileSystem();
 
 		[BeforeAll]
 		public void StartSimulator() {
 			apiHost = WebApp.Start(ApiBaseAddress, app => {
 				var config = new HttpConfiguration();
 				deps = new SimpleDependencyResolver(config.DependencyResolver);
-				deps.Register<LauncherApiController>(() => new LauncherApiController(knownTokens));
+				deps.Register<LauncherApiController>(() => new LauncherApiController(knownTokens, fs));
 				var sim = new SafeSimStartup();
 				sim.Configure(app, config);
 				config.DependencyResolver = deps;
@@ -54,16 +57,58 @@ namespace Drunkcod.Safenet.Specs
 		}
 
 		public async Task auth_expire_token() {
+			await Authorize();
+			Check.That(() => safe.AuthDeleteAsync().Result.StatusCode == HttpStatusCode.OK);
+			Check.That(() => safe.AuthGetAsync().Result.StatusCode == HttpStatusCode.Unauthorized);
+		}
+
+		public async Task dns_requires_auth() {
+			Check.That(() => safe.DnsGetAsync().Result.StatusCode == HttpStatusCode.Unauthorized);
+		}
+
+		public async Task nfs_app_directory_requires_auth() {
+			Check.That(() => safe.NfsGetDirectoryAsync("app", string.Empty).Result.StatusCode == HttpStatusCode.Unauthorized);
+		}
+
+		public async Task nfs_app_root_is_private() {
+			await Authorize();
+			Check.With(() => safe.NfsGetDirectoryAsync("app", string.Empty).Result)
+			.That(
+				x => x.StatusCode == HttpStatusCode.OK,
+				x => x.Response.Info.IsPrivate);
+		}
+
+		public async Task nfs_app_create_directory() {
+			await Authorize();
+			Check.That(() => safe.NfsPostAsync(new SafenetNfsCreateDirectoryRequest {
+				RootPath = "app",
+				DirectoryPath = "test",
+				IsPrivate = false,
+			}).Result.StatusCode == HttpStatusCode.OK);
+
+			//Visible from app root?
+			Check.With(() => safe.NfsGetDirectoryAsync("app", string.Empty).Result)
+			.That(
+				x => x.StatusCode == HttpStatusCode.OK,
+				x => x.Response.SubDirectories.Any(dir => dir.Name == "test"));
+
+			Check.With(() => safe.NfsGetDirectoryAsync("app", "test").Result)
+			.That(
+				x => x.StatusCode == HttpStatusCode.OK,
+				x => x.Response.Info.Name == "test",
+				x => x.Response.Info.IsPrivate == false);
+
+		}
+
+		private async Task Authorize() {
 			var auth = await safe.AuthPostAsync(MakeTestAppAuthRequest());
 			Check.That(
 				() => auth.StatusCode == HttpStatusCode.OK,
 				() => !string.IsNullOrEmpty(auth.Response.Token));
 			safe.SetToken(auth.Response.Token);
-			Check.That(() => safe.AuthDeleteAsync().Result.StatusCode == HttpStatusCode.OK);
-			Check.That(() => safe.AuthGetAsync().Result.StatusCode == HttpStatusCode.Unauthorized);
 		}
 
-		private static SafenetAuthRequest MakeTestAppAuthRequest() =>
+		static SafenetAuthRequest MakeTestAppAuthRequest() =>
 			new SafenetAuthRequest {
 				App = new SafenetAppInfo {
 					Id = "TestApp",

@@ -65,6 +65,9 @@ namespace Drunkcod.Safenet
 		public Task<SafenetResponse<SafenetEmptyResponse>> DnsDeleteAsync(string longName) =>
 			EmptyResponseAsync(http.DeleteAsync($"/dns/{longName}"));
 
+		public Task<SafenetResponse<SafenetDirectoryResponse>> NfsGetDirectoryAsync(string rootPath, string directoryPath) =>
+			MakeResponseAsync<SafenetDirectoryResponse>(http.GetAsync($"/nfs/directory/{rootPath}/{directoryPath}")); 
+
 		public Task<SafenetResponse<SafenetFileResponse>> NfsGetFileAsync(string rootPath, string filePath) => 
 			MakeFileResponse(http.GetAsync($"/nfs/file/{rootPath}/{WebUtility.UrlEncode(filePath)}")); 
 

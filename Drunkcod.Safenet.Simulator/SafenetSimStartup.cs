@@ -16,6 +16,7 @@ namespace Drunkcod.Safenet.Simulator
 	{
 		public void Configure(IAppBuilder appBuilder, HttpConfiguration config)
 		{
+			config.Formatters.Remove(config.Formatters.XmlFormatter);
 			config.MapHttpAttributeRoutes();
 			appBuilder.UseWebApi(config);
 		}
