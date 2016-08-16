@@ -49,7 +49,7 @@ namespace Drunkcod.Safenet.Simulator.Controllers
 			return new string[0];
 		}
 
-		[HttpGet, Route("nfs/directory/{root}/{directory?}")]
+		[HttpGet, Route("nfs/directory/{root}/{*directory?}")]
 		public SafenetDirectoryResponse NfsGetDirectory(string root, string directory = "") {
 			Authorize();
 			var dir = fs.GetOrCreateDirectory(Path.Combine(root, directory));
@@ -117,7 +117,5 @@ namespace Drunkcod.Safenet.Simulator.Controllers
 
 		bool IsAuthorized(AuthenticationHeaderValue auth) =>
 			auth != null && auth.Scheme == "Bearer" && knownTokens.Contains(auth.Parameter);
-
-
 	}
 }
