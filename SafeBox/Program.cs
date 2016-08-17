@@ -15,7 +15,7 @@ namespace SafeBox
 	class Program
 	{
 		static T GetAttribute<T>() where T : Attribute =>
-			(typeof(Program).Assembly.GetCustomAttribute(typeof(T)) as T);
+			(T)typeof(Program).Assembly.GetCustomAttribute(typeof(T));
 		
 		static int Main(string[] args) {
 			if(args.Length != 2) { 
@@ -65,13 +65,14 @@ namespace SafeBox
 					return -4;
 				}
 				var parent = getParent.Result.Response;
-				var p = Path.GetFileName(target + currentDir);
+				var targetPath = target + currentDir;
+				var p = Path.GetFileName(targetPath);
 				if (!parent.SubDirectories.Any(x => x.Name == p))
 				{
 					var makeTarget = safe.NfsPostAsync(new SafenetNfsCreateDirectoryRequest
 					{
 						RootPath = "app",
-						DirectoryPath = target + currentDir,
+						DirectoryPath = targetPath,
 						IsPrivate = true,
 					});
 					if (makeTarget.Result.StatusCode != HttpStatusCode.OK)
@@ -81,16 +82,16 @@ namespace SafeBox
 					}
 				}
 				Console.WriteLine(target + currentDir);
-				var getCurrent = safe.NfsGetDirectoryAsync("app", target + currentDir);
-				if (getCurrent.Result.StatusCode != HttpStatusCode.OK)
+				var getCurrentTarget = safe.NfsGetDirectoryAsync("app", targetPath);
+				if (getCurrentTarget.Result.StatusCode != HttpStatusCode.OK)
 				{
 					Console.WriteLine("Failed to get directory");
 					return -4;
 				}
-				var current = getCurrent.Result.Response;
+				var current = getCurrentTarget.Result.Response;
 				foreach (var item in c.EnumerateFiles("*"))
 				{
-					if (!current.Files.Any(x => x.Name == item.Name))
+					if (current.Files.All(x => x.Name != item.Name))
 					{
 						var fileX = safe.NfsPostAsync(new SafenetNfsPutFileRequest
 						{

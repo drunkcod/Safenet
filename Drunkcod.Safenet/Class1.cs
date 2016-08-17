@@ -10,7 +10,11 @@ namespace Drunkcod.Safenet
 	{
 		public T Response;
 		public SafenetError? Error;
-		public HttpStatusCode StatusCode;
+		public readonly HttpStatusCode StatusCode;
+
+		public SafenetResponse(HttpStatusCode status) {
+			this.StatusCode = status;
+		}
 	}
 
 	public struct SafenetError

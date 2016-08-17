@@ -88,48 +88,46 @@ namespace Drunkcod.Safenet
 			EmptyResponseAsync(http.DeleteAsync($"/nfs/file/{rootPath}/{filePath}")); 
 
 		async Task<SafenetResponse<SafenetFileResponse>> MakeFileResponse(Task<HttpResponseMessage> request) {
-			var r = await request;
-			var response = new SafenetResponse<SafenetFileResponse> {StatusCode = r.StatusCode};
+			var r = await request.ConfigureAwait(false);
+			var response = new SafenetResponse<SafenetFileResponse> { StatusCode = r.StatusCode };
 			if (r.IsSuccessStatusCode)
-				response.Response = new SafenetFileResponse
-				{
+				response.Response = new SafenetFileResponse {
 					CreatedOn = DateTime.Parse(r.Headers.GetValues("created-on").Single()),
 					ModifiedOn = DateTime.Parse(r.Content.Headers.GetValues("last-modified").Single()),
 					ContentLength = r.Content.Headers.ContentLength,
 					ContentType = r.Content.Headers.ContentType,
 					ContentRange = r.Content.Headers.ContentRange,
 					Metadata = Convert.FromBase64String(HeaderOrDefault(r.Headers, "metadata", string.Empty)),
-					Body = await r.Content.ReadAsStreamAsync()
+					Body = await r.Content.ReadAsStreamAsync().ConfigureAwait(false)
 				};
 			else
-				await SetError(response, r);
+				await SetError(response, r).ConfigureAwait(false);
 			return response;
 		}
 
 		async Task<SafenetResponse<SafenetEmptyResponse>> EmptyResponseAsync(Task<HttpResponseMessage> request) {
-			var r = await request;
-			var response = new SafenetResponse<SafenetEmptyResponse> {StatusCode = r.StatusCode};
+			var r = await request.ConfigureAwait(false);
+			var response = new SafenetResponse<SafenetEmptyResponse> { StatusCode = r.StatusCode };
 			if (!r.IsSuccessStatusCode)
-				await SetError(response, r);
+				await SetError(response, r).ConfigureAwait(false);
 			return response;
-		}
-
-		private async Task SetError<T>(SafenetResponse<T> response, HttpResponseMessage r)
-		{
-			response.Error = r.Content.Headers.ContentType?.MediaType == "application/json"
-				? Deserialize<SafenetError>(await r.Content.ReadAsStreamAsync())
-				: new SafenetError {Description = await r.Content.ReadAsStringAsync()};
 		}
 
 		async Task<SafenetResponse<T>> MakeResponseAsync<T>(Task<HttpResponseMessage> request) {
-			var r = await request;
-			var response = new SafenetResponse<T> {StatusCode = r.StatusCode};
-			var body = await r.Content.ReadAsStreamAsync();
+			var r = await request.ConfigureAwait(false);
+			var response = new SafenetResponse<T> { StatusCode = r.StatusCode };
+			var body = await r.Content.ReadAsStreamAsync().ConfigureAwait(false);
 			if (r.IsSuccessStatusCode)
 				response.Response = Deserialize<T>(body);
 			else
-				await SetError(response, r);
+				await SetError(response, r).ConfigureAwait(false);
 			return response;
+		}
+
+		async Task SetError<T>(SafenetResponse<T> response, HttpResponseMessage r) {
+			response.Error = r.Content.Headers.ContentType?.MediaType == "application/json"
+				? Deserialize<SafenetError>(await r.Content.ReadAsStreamAsync().ConfigureAwait(false))
+				: new SafenetError { Description = await r.Content.ReadAsStringAsync().ConfigureAwait(false) };
 		}
 
 		static string HeaderOrDefault(HttpHeaders headers, string header, string defaultValue) {
