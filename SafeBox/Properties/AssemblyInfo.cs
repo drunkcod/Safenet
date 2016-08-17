@@ -5,17 +5,22 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("SafenetSim")]
+[assembly: AssemblyTitle("SafeBox")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("drunkcod")]
-[assembly: AssemblyProduct("SafenetSim")]
+[assembly: AssemblyProduct("SafeBox")]
 [assembly: AssemblyCopyright("Copyright ©  2016")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
+// Setting ComVisible to false makes the types in this assembly not visible 
+// to COM components.  If you need to access a type in this assembly from 
+// COM, set the ComVisible attribute to true on that type.
 [assembly: ComVisible(false)]
-[assembly: Guid("6324ec65-9c48-47a3-ad92-89f5d1d24a28")]
+
+// The following GUID is for the ID of the typelib if this project is exposed to COM
+[assembly: Guid("bc228ca0-b207-4004-9400-ae320c1ec6b9")]
 
 [assembly: AssemblyVersion("0.0.0.1")]
 [assembly: AssemblyFileVersion("0.0.0.1")]
