@@ -27,6 +27,7 @@ namespace MySafenet
 					var deletePublicId = safe.DnsDeleteAsync(node.Text).Result;
 					if(deletePublicId.StatusCode != HttpStatusCode.OK) {
 						MessageBox.Show($"Failed to delete public id '{node.Text}'", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+						return;
 					}
 					DnsView.Nodes.Remove(node);
 				}),

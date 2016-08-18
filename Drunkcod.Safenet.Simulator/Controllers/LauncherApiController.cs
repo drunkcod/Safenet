@@ -14,10 +14,12 @@ namespace Drunkcod.Safenet.Simulator.Controllers
 	{
 		readonly HashSet<string> knownTokens;
 		readonly SafenetInMemoryFileSystem fs;
+		readonly SafenetInMemoryDns dns;
 
-		public LauncherApiController(HashSet<string> knownTokens, SafenetInMemoryFileSystem fs) {
+		public LauncherApiController(HashSet<string> knownTokens, SafenetInMemoryFileSystem fs, SafenetInMemoryDns dns) {
 			this.knownTokens = knownTokens;
 			this.fs = fs;
+			this.dns = dns;
 		}
 
 		[HttpGet, Route("auth")]
@@ -46,7 +48,21 @@ namespace Drunkcod.Safenet.Simulator.Controllers
 		[HttpGet, Route("dns")]
 		public string[] DnsGet() {
 			Authorize();
-			return new string[0];
+			return dns.GetServices().ToArray();
+		}
+
+		[HttpPost, Route("dns/{longName}")]
+		public HttpResponseMessage DnsRegister(string longName) {
+			Authorize();
+			dns.Register(longName);
+			return new HttpResponseMessage(HttpStatusCode.OK);
+		}
+
+		[HttpDelete, Route("dns/{longName}")]
+		public HttpResponseMessage DnsDelete(string longName) {
+			Authorize();
+			dns.Unregister(longName);
+			return new HttpResponseMessage(HttpStatusCode.OK);
 		}
 
 		[HttpGet, Route("nfs/directory/{root}/{*directory?}")]

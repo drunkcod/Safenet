@@ -15,10 +15,11 @@ namespace SafenetSim
 			var apiBaseAddress = args[0];
 			var knownTokens = new HashSet<string>();
 			var fs = new SafenetInMemoryFileSystem();
+			var dns = new SafenetInMemoryDns();
 			var apiHost = WebApp.Start(apiBaseAddress, app => {
 				var config = new HttpConfiguration();
 				var deps = new SimpleDependencyResolver(config.DependencyResolver);
-				deps.Register<LauncherApiController>(() => new LauncherApiController(knownTokens, fs));
+				deps.Register<LauncherApiController>(() => new LauncherApiController(knownTokens, fs, dns));
 				var sim = new SafeSimStartup();
 				app.Use((Func<Func<IDictionary<string,object>,Task>,Func<IDictionary<string,object>,Task>>)Log);
 				sim.Configure(app, config);

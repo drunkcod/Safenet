@@ -25,13 +25,14 @@ namespace Drunkcod.Safenet.Specs
 
 		readonly HashSet<string> knownTokens = new HashSet<string>();
 		readonly SafenetInMemoryFileSystem fs = new SafenetInMemoryFileSystem();
+		readonly SafenetInMemoryDns dns = new SafenetInMemoryDns();
 
 		[BeforeAll]
 		public void StartSimulator() {
 			apiHost = WebApp.Start(ApiBaseAddress, app => {
 				var config = new HttpConfiguration();
 				deps = new SimpleDependencyResolver(config.DependencyResolver);
-				deps.Register<LauncherApiController>(() => new LauncherApiController(knownTokens, fs));
+				deps.Register<LauncherApiController>(() => new LauncherApiController(knownTokens, fs, dns));
 				var sim = new SafeSimStartup();
 				sim.Configure(app, config);
 				config.DependencyResolver = deps;
@@ -45,6 +46,7 @@ namespace Drunkcod.Safenet.Specs
 		public void NewSafenetClient() {
 			safe = new SafenetClient(ApiBaseAddress);
 			fs.Clear();
+			dns.Clear();
 		}
 
 		public void auth_without_token_is_unauthorized() {
@@ -61,7 +63,7 @@ namespace Drunkcod.Safenet.Specs
 		}
 
 		public async Task auth_expire_token() {
-			await Authorize();
+			await AuthorizeAsync();
 			Check.That(() => safe.AuthDeleteAsync().Result.StatusCode == HttpStatusCode.OK);
 			Check.That(() => safe.AuthGetAsync().Result.StatusCode == HttpStatusCode.Unauthorized);
 		}
@@ -70,12 +72,26 @@ namespace Drunkcod.Safenet.Specs
 			Check.That(() => safe.DnsGetAsync().Result.StatusCode == HttpStatusCode.Unauthorized);
 		}
 
+		public async Task dns_register_long_name() {
+			await AuthorizeAsync();
+			Check.That(() => safe.DnsPostAsync("example").Result.StatusCode == HttpStatusCode.OK);
+			Check.With(() => safe.DnsGetAsync().Result)
+			.That(dns => dns.Response.Contains("example"));
+		}
+
+		public async Task dns_unregister_long_name() {
+			await AuthorizeAsync();
+			Check.That(() => safe.DnsPostAsync("example").Result.StatusCode == HttpStatusCode.OK);
+			Check.That(() => safe.DnsDeleteAsync("example").Result.StatusCode == HttpStatusCode.OK);
+			Check.That(() => safe.DnsGetAsync().Result.Response.Length == 0);
+		}
+
 		public async Task nfs_app_directory_requires_auth() {
 			Check.That(() => safe.NfsGetDirectoryAsync("app", string.Empty).Result.StatusCode == HttpStatusCode.Unauthorized);
 		}
 
 		public async Task nfs_app_root_is_private() {
-			await Authorize();
+			await AuthorizeAsync();
 			Check.With(() => safe.NfsGetDirectoryAsync("app", string.Empty).Result)
 			.That(
 				x => x.StatusCode == HttpStatusCode.OK,
@@ -83,7 +99,7 @@ namespace Drunkcod.Safenet.Specs
 		}
 
 		public async Task nfs_app_create_directory() {
-			await Authorize();
+			await AuthorizeAsync();
 			Check.That(() => safe.NfsPostAsync(new SafenetNfsCreateDirectoryRequest {
 				RootPath = "app",
 				DirectoryPath = "test",
@@ -104,7 +120,7 @@ namespace Drunkcod.Safenet.Specs
 		}
 
 		public async Task nfs_get_subdirectory() {
-			await Authorize();
+			await AuthorizeAsync();
 			Check.That(() => safe.NfsPostAsync(new SafenetNfsCreateDirectoryRequest {
 				RootPath = "app",
 				DirectoryPath = "parent/child",
@@ -120,7 +136,7 @@ namespace Drunkcod.Safenet.Specs
 		}
 
 		public async Task nfs_upload_file() {
-			await Authorize();
+			await AuthorizeAsync();
 			Check.That(() => safe.NfsPostAsync(new SafenetNfsPutFileRequest {
 				RootPath = "app",
 				FilePath = "test.txt",
@@ -147,7 +163,7 @@ namespace Drunkcod.Safenet.Specs
 		}
 
 		public async Task nfs_upload_file_bad_request_if_exists() {
-			await Authorize();
+			await AuthorizeAsync();
 			Check.That(() => safe.NfsPostAsync(TextFile()).Result.StatusCode == HttpStatusCode.OK);
 			Check.That(() => safe.NfsPostAsync(TextFile()).Result.StatusCode == HttpStatusCode.BadRequest);
 		}
@@ -163,7 +179,7 @@ namespace Drunkcod.Safenet.Specs
 		}
 
 		public async Task nfs_delete_file() {
-			await Authorize();
+			await AuthorizeAsync();
 			Check.That(() => safe.NfsPostAsync(new SafenetNfsPutFileRequest {
 				RootPath = "app",
 				FilePath = "test.txt",
@@ -176,11 +192,11 @@ namespace Drunkcod.Safenet.Specs
 		}
 
 		public async Task nfs_delete_missing_file_is_not_found() {
-			await Authorize();
+			await AuthorizeAsync();
 			Check.That(() => safe.NfsDeleteFileAsync("app", "no-such.file").Result.StatusCode == HttpStatusCode.NotFound);
 		}
 
-		private async Task Authorize() {
+		private async Task AuthorizeAsync() {
 			var auth = await safe.AuthPostAsync(MakeTestAppAuthRequest());
 			Check.That(
 				() => auth.StatusCode == HttpStatusCode.OK,
