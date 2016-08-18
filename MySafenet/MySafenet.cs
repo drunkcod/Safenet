@@ -34,6 +34,9 @@ namespace MySafenet
 					}
 					DnsView.Nodes.Remove(node);
 				}),
+				new MenuItem("Add Service", (s, args) => {
+
+				}),
 			});
 			DnsView.NodeMouseClick += (s, args) => {
 				if(args.Button != MouseButtons.Right)
@@ -42,9 +45,11 @@ namespace MySafenet
 				dnsActions.Show((Control)s, args.Location);
 			};
 
-			ThreadPool.QueueUserWorkItem(_ => { 
+			var ui = SynchronizationContext.Current;
+
+			ThreadPool.QueueUserWorkItem(state => { 
 				var steps = new [] {
-					new KeyValuePair<string, Func<Task>>("Authorize", async () => {
+					new KeyValuePair<string, Func<Task>>("Requesting authorization...", async () => {
 						var getToken = await safe.AuthPostAsync(new SafenetAuthRequest {
 							App = new SafenetAppInfo {
 								Id = "drunckod.mysafenet",
@@ -57,12 +62,12 @@ namespace MySafenet
 							throw new Exception("Failed to get authorization.");
 						safe.SetToken(getToken.Response.Token);
 					}), 
-					new KeyValuePair<string, Func<Task>>("Load Application Data", async () => Thread.Sleep(100)),
-					new KeyValuePair<string, Func<Task>>("Preparing UI", async () => {
+					new KeyValuePair<string, Func<Task>>("Loading DNS info...", async () => {
 						var getDns = await safe.DnsGetAsync();
 						if(getDns.StatusCode != HttpStatusCode.OK)
 							throw new Exception("Failed to get Public ID's");
-						Invoke(new Action<string[]>(dnsEntries => {
+						ui.Post(x => {
+							var dnsEntries = (string[])x;
 							ProgressLabel.Text = "My Public IDs";
 							DnsPanel.Visible = true;
 							var entries = dnsEntries.Length;
@@ -74,34 +79,32 @@ namespace MySafenet
 									var target = (TreeNode)n;
 									var getServices = safe.DnsGetAsync(target.Text).Result;
 									if(getServices.StatusCode == HttpStatusCode.OK) {
-										Invoke(new Action(() => {
+										ui.Post(_ => {
 											foreach(var service in getServices.Response)
 												target.Nodes.Add(service);
-										}));
+										}, null);
 									}
-									else
-									{
+									else {
 										MessageBox.Show($"Failed to get services connected to {target.Text}", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
 									}
 									if(--entries == 0)
-										Invoke(new Action(() => {
-											DnsView.Enabled = true;
-										}));
+										ui.Post(_ => DnsView.Enabled = true, null);
 								}, node);
 							}
-						}), new object[] { getDns.Response });
+						},getDns.Response);
 					})
 				};
 
-				Invoke(new Action(() => {
+				ui.Post(_ => {
 					ConnectionProgres.Step = 1;
 					ConnectionProgres.Maximum = steps.Length;
-				}));
+				}, null);
+
 				try { 
 					foreach(var item in steps) {
-						Invoke(new Action(() => ProgressLabel.Text = item.Key));
+						ui.Post(_ => ProgressLabel.Text = item.Key, null);
 						item.Value().Wait();
-						Invoke(new Action(() => ConnectionProgres.PerformStep()));
+						ui.Post(_ => ConnectionProgres.PerformStep(), null);
 					}
 				} catch(AggregateException ex) {
 					MessageBox.Show(ex.InnerException.Message, "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
