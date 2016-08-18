@@ -86,6 +86,32 @@ namespace Drunkcod.Safenet.Specs
 			Check.That(() => safe.DnsGetAsync().Result.Response.Length == 0);
 		}
 
+		public async Task dns_get_services_by_long_name() {
+			await AuthorizeAsync();
+			Check.That(() => safe.DnsPostAsync("example").Result.StatusCode == HttpStatusCode.OK);
+
+			var getServices = safe.DnsGetAsync("example").Result; 
+			Check.That(() => getServices.StatusCode == HttpStatusCode.OK);
+			Check.That(() => getServices.Response.Length == 0);
+		}
+
+		public async Task dns_add_service_to_long_name() {
+			await AuthorizeAsync();
+			Check.That(() => safe.DnsPostAsync("example").Result.StatusCode == HttpStatusCode.OK);
+
+			Check.That(() => safe.DnsPutAsync(new SafenetDnsRegisterServiceRequest {
+				RootPath = "app",
+				LongName = "example",
+				ServiceName = "www",
+				ServiceHomeDirPath = "/www"
+			}).Result.StatusCode == HttpStatusCode.OK);
+
+			var getServices = safe.DnsGetAsync("example").Result; 
+			Check.That(() => getServices.StatusCode == HttpStatusCode.OK);
+			Check.That(() => getServices.Response.Length == 1);
+			Check.That(() => getServices.Response[0] == "www");
+		}
+
 		public async Task nfs_app_directory_requires_auth() {
 			Check.That(() => safe.NfsGetDirectoryAsync("app", string.Empty).Result.StatusCode == HttpStatusCode.Unauthorized);
 		}

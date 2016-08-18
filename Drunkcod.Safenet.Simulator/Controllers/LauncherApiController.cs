@@ -48,7 +48,20 @@ namespace Drunkcod.Safenet.Simulator.Controllers
 		[HttpGet, Route("dns")]
 		public string[] DnsGet() {
 			Authorize();
-			return dns.GetServices().ToArray();
+			return dns.GetServices().Select(x => x.Key).ToArray();
+		}
+
+		[HttpPut, Route("dns")]
+		public HttpResponseMessage DnsAddSerivce([FromBody] SafenetDnsRegisterServiceRequest input) {
+			Authorize();
+			dns.BindService(input.LongName, input.ServiceName);
+			return new HttpResponseMessage(HttpStatusCode.OK);
+		}
+
+		[HttpGet, Route("dns/{longName}")]
+		public string[] DnsGet(string longName) {
+			Authorize();
+			return dns.GetServices(longName);
 		}
 
 		[HttpPost, Route("dns/{longName}")]

@@ -18,6 +18,9 @@ namespace MySafenet
 		}
 
 		private void MySafenet_Load(object sender, EventArgs e) {
+			Panel_SizeChanged(LoadingPanel, EventArgs.Empty);
+			Panel_SizeChanged(DnsPanel, EventArgs.Empty);
+
 			dnsActions = new ContextMenu(new [] {
 				new MenuItem("Delete", (s, args) => {
 					var m = (MenuItem)s;
@@ -54,20 +57,39 @@ namespace MySafenet
 							throw new Exception("Failed to get authorization.");
 						safe.SetToken(getToken.Response.Token);
 					}), 
-					new KeyValuePair<string, Func<Task>>("Load Application Data", async () => Thread.Sleep(100)), 
+					new KeyValuePair<string, Func<Task>>("Load Application Data", async () => Thread.Sleep(100)),
 					new KeyValuePair<string, Func<Task>>("Preparing UI", async () => {
 						var getDns = await safe.DnsGetAsync();
 						if(getDns.StatusCode != HttpStatusCode.OK)
 							throw new Exception("Failed to get Public ID's");
-						Invoke(new Action(() => {
+						Invoke(new Action<string[]>(dnsEntries => {
+							ProgressLabel.Text = "My Public IDs";
 							DnsPanel.Visible = true;
-							foreach(var item in getDns.Response) {
+							var entries = dnsEntries.Length;
+							if(entries > 0)
+								DnsView.Enabled = false;
+							foreach(var item in dnsEntries) {
 								var node = DnsView.Nodes.Add(item);
-								var getServices = safe.DnsGetAsync(item).Result;
-								foreach(var service in getServices.Response)
-									node.Nodes.Add(service);
+								ThreadPool.QueueUserWorkItem(n => {
+									var target = (TreeNode)n;
+									var getServices = safe.DnsGetAsync(target.Text).Result;
+									if(getServices.StatusCode == HttpStatusCode.OK) {
+										Invoke(new Action(() => {
+											foreach(var service in getServices.Response)
+												target.Nodes.Add(service);
+										}));
+									}
+									else
+									{
+										MessageBox.Show($"Failed to get services connected to {target.Text}", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+									}
+									if(--entries == 0)
+										Invoke(new Action(() => {
+											DnsView.Enabled = true;
+										}));
+								}, node);
 							}
-						}));
+						}), new object[] { getDns.Response });
 					})
 				};
 
@@ -95,6 +117,12 @@ namespace MySafenet
 				return;
 			}
 			DnsView.Nodes.Add(NewDnsName.Text);
+		}
+
+		private void Panel_SizeChanged(object sender, EventArgs e) {
+			var c = (Control)sender;
+			foreach(Control item in c.Controls)
+				item.Left = (item.Parent.ClientSize.Width - item.Width) / 2;
 		}
 	}
 }
