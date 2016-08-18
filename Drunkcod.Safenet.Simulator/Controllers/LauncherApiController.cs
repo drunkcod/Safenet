@@ -27,10 +27,10 @@ namespace Drunkcod.Safenet.Simulator.Controllers
 		}
 
 		[HttpPost, Route("auth")]
-		public object AuthPost() {
+		public SafenetAuthResponse AuthPost() {
 			var token = Guid.NewGuid().ToString();
 			knownTokens.Add(token);
-			return new { token };
+			return new SafenetAuthResponse { Token = token };
 		}
 
 		[HttpDelete, Route("auth")]

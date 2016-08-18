@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SafenetSim", "SafenetSim\Sa
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SafeBox", "SafeBox\SafeBox.csproj", "{BC228CA0-B207-4004-9400-AE320C1EC6B9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MySafenet", "MySafenet\MySafenet.csproj", "{B3802EFF-4049-4E93-BE31-45F7BD9C7448}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,6 +41,10 @@ Global
 		{BC228CA0-B207-4004-9400-AE320C1EC6B9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BC228CA0-B207-4004-9400-AE320C1EC6B9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BC228CA0-B207-4004-9400-AE320C1EC6B9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B3802EFF-4049-4E93-BE31-45F7BD9C7448}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B3802EFF-4049-4E93-BE31-45F7BD9C7448}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B3802EFF-4049-4E93-BE31-45F7BD9C7448}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B3802EFF-4049-4E93-BE31-45F7BD9C7448}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
