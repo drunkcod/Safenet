@@ -72,6 +72,7 @@ namespace Drunkcod.Safenet.Simulator
 		public byte[] Bytes;
 		public DateTime CreatedOn;
 		public DateTime ModifiedOn;
+		public byte[] Metadata;
 	}
 
 }

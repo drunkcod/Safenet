@@ -89,7 +89,7 @@ namespace Drunkcod.Safenet
 
 		async Task<SafenetResponse<SafenetFileResponse>> MakeFileResponse(Task<HttpResponseMessage> request) {
 			var r = await request.ConfigureAwait(false);
-			var response = new SafenetResponse<SafenetFileResponse> { StatusCode = r.StatusCode };
+			var response = new SafenetResponse<SafenetFileResponse>(r.StatusCode);
 			if (r.IsSuccessStatusCode)
 				response.Response = new SafenetFileResponse {
 					CreatedOn = DateTime.Parse(r.Headers.GetValues("created-on").Single()),
@@ -107,7 +107,7 @@ namespace Drunkcod.Safenet
 
 		async Task<SafenetResponse<SafenetEmptyResponse>> EmptyResponseAsync(Task<HttpResponseMessage> request) {
 			var r = await request.ConfigureAwait(false);
-			var response = new SafenetResponse<SafenetEmptyResponse> { StatusCode = r.StatusCode };
+			var response = new SafenetResponse<SafenetEmptyResponse>(r.StatusCode);
 			if (!r.IsSuccessStatusCode)
 				await SetError(response, r).ConfigureAwait(false);
 			return response;
@@ -115,7 +115,7 @@ namespace Drunkcod.Safenet
 
 		async Task<SafenetResponse<T>> MakeResponseAsync<T>(Task<HttpResponseMessage> request) {
 			var r = await request.ConfigureAwait(false);
-			var response = new SafenetResponse<T> { StatusCode = r.StatusCode };
+			var response = new SafenetResponse<T>(r.StatusCode);
 			var body = await r.Content.ReadAsStreamAsync().ConfigureAwait(false);
 			if (r.IsSuccessStatusCode)
 				response.Response = Deserialize<T>(body);

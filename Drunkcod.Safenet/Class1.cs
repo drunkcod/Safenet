@@ -57,7 +57,7 @@ namespace Drunkcod.Safenet
 		[JsonProperty("isVersioned")] public bool IsVersioned;
 		[JsonProperty("createdOn")] public DateTime CreatedOn;
 		[JsonProperty("modifiedOn")] public DateTime ModifiedOn;
-		[JsonProperty("metadata")] public string Metdata;
+		[JsonProperty("metadata")] public byte[] Metdata;
 	}
 
 	public class SafenetFileInfo
@@ -66,7 +66,7 @@ namespace Drunkcod.Safenet
 		[JsonProperty("size")] public int Size;
 		[JsonProperty("createdOn")] public DateTime CreatedOn;
 		[JsonProperty("modifiedOn")] public DateTime ModifiedOn;
-		[JsonProperty("metadata")] public string Metadata;
+		[JsonProperty("metadata")] public byte[] Metadata;
 	}
 
 	public class SafenetFileResponse

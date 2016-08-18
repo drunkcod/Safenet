@@ -37,12 +37,12 @@ namespace SafeBox
 					Vendor = GetAttribute<AssemblyCompanyAttribute>().Company,
 					Version = typeof(Program).Assembly.GetName().Version.ToString(4),
 				}
-			});
-			if(auth.Result.StatusCode != HttpStatusCode.OK) {
+			}).Result;
+			if(auth.StatusCode != HttpStatusCode.OK) {
 				Console.WriteLine("Auth failed.");
 				return -3;
 			}
-			safe.SetToken(auth.Result.Response.Token);
+			safe.SetToken(auth.Response.Token);
 
 			return UploadDirectory(source, safe, target);
 		}

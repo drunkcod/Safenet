@@ -61,6 +61,7 @@ namespace Drunkcod.Safenet.Simulator.Controllers
 					Size = x.Bytes.Length,
 					CreatedOn = x.CreatedOn,
 					ModifiedOn = x.ModifiedOn,
+					Metadata = x.Metadata,
 				}).ToArray(),
 			};
 		}
