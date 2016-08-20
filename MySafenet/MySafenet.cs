@@ -49,7 +49,7 @@ namespace MySafenet
 
 			ThreadPool.QueueUserWorkItem(state => { 
 				var steps = new [] {
-					new KeyValuePair<string, Func<Task>>("Requesting authorization...", async () => {
+					Step("Requesting authorization...", async () => {
 						var getToken = await safe.AuthPostAsync(new SafenetAuthRequest {
 							App = new SafenetAppInfo {
 								Id = "drunckod.mysafenet",
@@ -62,7 +62,7 @@ namespace MySafenet
 							throw new Exception("Failed to get authorization.");
 						safe.SetToken(getToken.Response.Token);
 					}), 
-					new KeyValuePair<string, Func<Task>>("Loading DNS info...", async () => {
+					Step("Loading DNS info...", async () => {
 						var getDns = await safe.DnsGetAsync();
 						if(getDns.StatusCode != HttpStatusCode.OK)
 							throw new Exception("Failed to get Public ID's");
@@ -113,7 +113,9 @@ namespace MySafenet
 			});
 		}
 
-		private void DnsAdd_Click(object sender, EventArgs e) {
+		static KeyValuePair<string, Func<Task>> Step(string name, Func<Task> func) => new KeyValuePair<string, Func<Task>>(name, func); 
+
+		void DnsAdd_Click(object sender, EventArgs e) {
 			var createService = safe.DnsPostAsync(NewDnsName.Text).Result;
 			if(createService.StatusCode != HttpStatusCode.OK) { 
 				MessageBox.Show("Failed to register service", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
