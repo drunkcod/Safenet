@@ -26,68 +26,68 @@ namespace Drunkcod.Safenet
 			http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 		}
 
-		public Task<SafenetResponse<SafenetEmptyResponse>> AuthGetAsync() =>
+		public Task<SafenetEmptyResponse> AuthGetAsync() =>
 			EmptyResponseAsync(http.GetAsync("/auth")); 
 
 		public Task<SafenetResponse<SafenetAuthResponse>> AuthPostAsync(SafenetAuthRequest auth) =>
-			MakeResponseAsync<SafenetAuthResponse>(http.PostAsync("/auth", ToPayload(auth)));
+			ReadResponseAsync<SafenetAuthResponse>(http.PostAsync("/auth", ToPayload(auth)));
 
-		public Task<SafenetResponse<SafenetEmptyResponse>> AuthDeleteAsync() =>
+		public Task<SafenetEmptyResponse> AuthDeleteAsync() =>
 			EmptyResponseAsync(http.DeleteAsync("/auth")); 
 
 		public Task<SafenetResponse<string[]>> DnsGetAsync() =>
-			MakeResponseAsync<string[]>(http.GetAsync("/dns"));
+			ReadResponseAsync<string[]>(http.GetAsync("/dns"));
 
 		public Task<SafenetResponse<string[]>> DnsGetAsync(string longName) =>
-			MakeResponseAsync<string[]>(http.GetAsync($"/dns/{longName}"));
+			ReadResponseAsync<string[]>(http.GetAsync($"/dns/{longName}"));
 
 		public Task<SafenetResponse<SafenetDirectoryResponse>> DnsGetAsync(string service, string longName) =>
-			MakeResponseAsync<SafenetDirectoryResponse>(http.GetAsync($"/dns/{service}/{longName}"));
+			ReadResponseAsync<SafenetDirectoryResponse>(http.GetAsync($"/dns/{service}/{longName}"));
 
 		public Task<SafenetResponse<SafenetFileResponse>> DnsGetAsync(string service, string longName, string path) =>
-			MakeFileResponse(http.GetAsync($"/dns/{service}/{longName}/{WebUtility.UrlEncode(path)}"));
+			FileResponseAsync(http.GetAsync($"/dns/{service}/{longName}/{WebUtility.UrlEncode(path)}"));
 
 		public Task<SafenetResponse<SafenetFileResponse>> DnsGetAsync(string service, string longName, string path, RangeHeaderValue range) {
 			var rm = new HttpRequestMessage(HttpMethod.Get, $"/dns/{service}/{longName}/{WebUtility.UrlEncode(path)}");
 			rm.Headers.Range = range;
-			return MakeFileResponse(http.SendAsync(rm));
+			return FileResponseAsync(http.SendAsync(rm));
 		}
 
-		public Task<SafenetResponse<SafenetEmptyResponse>> DnsPostAsync(string longName) =>
+		public Task<SafenetEmptyResponse> DnsPostAsync(string longName) =>
 			EmptyResponseAsync(http.PostAsync($"/dns/{longName}", new StringContent(string.Empty)));
 
-		public Task<SafenetResponse<SafenetEmptyResponse>> DnsPostAsync(SafenetDnsRegisterServiceRequest service) =>
+		public Task<SafenetEmptyResponse> DnsPostAsync(SafenetDnsRegisterServiceRequest service) =>
 			EmptyResponseAsync(http.PostAsync("/dns", ToPayload(service)));
 
-		public Task<SafenetResponse<SafenetEmptyResponse>> DnsPutAsync(SafenetDnsRegisterServiceRequest service) =>
+		public Task<SafenetEmptyResponse> DnsPutAsync(SafenetDnsRegisterServiceRequest service) =>
 			EmptyResponseAsync(http.PutAsync("/dns", ToPayload(service)));
 
-		public Task<SafenetResponse<SafenetEmptyResponse>> DnsDeleteAsync(string longName) =>
+		public Task<SafenetEmptyResponse> DnsDeleteAsync(string longName) =>
 			EmptyResponseAsync(http.DeleteAsync($"/dns/{longName}"));
 
 		public Task<SafenetResponse<SafenetDirectoryResponse>> NfsGetDirectoryAsync(string rootPath, string directoryPath) =>
-			MakeResponseAsync<SafenetDirectoryResponse>(http.GetAsync($"/nfs/directory/{rootPath}/{directoryPath}")); 
+			ReadResponseAsync<SafenetDirectoryResponse>(http.GetAsync($"/nfs/directory/{rootPath}/{directoryPath}")); 
 
 		public Task<SafenetResponse<SafenetFileResponse>> NfsGetFileAsync(string rootPath, string filePath) => 
-			MakeFileResponse(http.GetAsync($"/nfs/file/{rootPath}/{WebUtility.UrlEncode(filePath)}")); 
+			FileResponseAsync(http.GetAsync($"/nfs/file/{rootPath}/{WebUtility.UrlEncode(filePath)}")); 
 
-		public Task<SafenetResponse<SafenetEmptyResponse>> NfsPostAsync(SafenetNfsCreateDirectoryRequest directory) =>
+		public Task<SafenetEmptyResponse> NfsPostAsync(SafenetNfsCreateDirectoryRequest directory) =>
 			EmptyResponseAsync(http.PostAsync($"/nfs/directory/{directory.RootPath}/{directory.DirectoryPath}", ToPayload(new {
 				isPrivate = directory.IsPrivate,
 				metadata = Convert.ToBase64String(directory.Metadata),
 			})));
 
-		public Task<SafenetResponse<SafenetEmptyResponse>> NfsPostAsync(SafenetNfsPutFileRequest file) {
+		public Task<SafenetEmptyResponse> NfsPostAsync(SafenetNfsPutFileRequest file) {
 			var body = new ByteArrayContent(file.Bytes);
 			body.Headers.ContentType = file.ContentType;
 			body.Headers.Add("Metadata", Convert.ToBase64String(file.Metadata));
 			return EmptyResponseAsync(http.PostAsync($"/nfs/file/{file.RootPath}/{file.FilePath}", body));
 		}
 
-		public Task<SafenetResponse<SafenetEmptyResponse>> NfsDeleteFileAsync(string rootPath, string filePath) =>
+		public Task<SafenetEmptyResponse> NfsDeleteFileAsync(string rootPath, string filePath) =>
 			EmptyResponseAsync(http.DeleteAsync($"/nfs/file/{rootPath}/{filePath}")); 
 
-		async Task<SafenetResponse<SafenetFileResponse>> MakeFileResponse(Task<HttpResponseMessage> request) {
+		async Task<SafenetResponse<SafenetFileResponse>> FileResponseAsync(Task<HttpResponseMessage> request) {
 			var r = await request.ConfigureAwait(false);
 			var response = new SafenetResponse<SafenetFileResponse>(r.StatusCode);
 			if (r.IsSuccessStatusCode)
@@ -97,43 +97,41 @@ namespace Drunkcod.Safenet
 					ContentLength = r.Content.Headers.ContentLength,
 					ContentType = r.Content.Headers.ContentType,
 					ContentRange = r.Content.Headers.ContentRange,
-					Metadata = Convert.FromBase64String(HeaderOrDefault(r.Headers, "metadata", string.Empty)),
+					Metadata = HeaderOrDefault(r.Headers, "metadata", Convert.FromBase64String, new byte[0]),
 					Body = await r.Content.ReadAsStreamAsync().ConfigureAwait(false)
 				};
 			else
-				await SetError(response, r).ConfigureAwait(false);
+				response.Error = await ReadErrorAsync(r.Content).ConfigureAwait(false);
 			return response;
 		}
 
-		async Task<SafenetResponse<SafenetEmptyResponse>> EmptyResponseAsync(Task<HttpResponseMessage> request) {
+		async Task<SafenetEmptyResponse> EmptyResponseAsync(Task<HttpResponseMessage> request) {
 			var r = await request.ConfigureAwait(false);
-			var response = new SafenetResponse<SafenetEmptyResponse>(r.StatusCode);
-			if (!r.IsSuccessStatusCode)
-				await SetError(response, r).ConfigureAwait(false);
-			return response;
+			return new SafenetEmptyResponse(r.StatusCode, r.IsSuccessStatusCode 
+				? (SafenetError?)null
+				: await ReadErrorAsync(r.Content).ConfigureAwait(false));
 		}
 
-		async Task<SafenetResponse<T>> MakeResponseAsync<T>(Task<HttpResponseMessage> request) {
+		async Task<SafenetResponse<T>> ReadResponseAsync<T>(Task<HttpResponseMessage> request) {
 			var r = await request.ConfigureAwait(false);
 			var response = new SafenetResponse<T>(r.StatusCode);
-			var body = await r.Content.ReadAsStreamAsync().ConfigureAwait(false);
 			if (r.IsSuccessStatusCode)
-				response.Response = Deserialize<T>(body);
+				response.Response = Deserialize<T>(await r.Content.ReadAsStreamAsync().ConfigureAwait(false));
 			else
-				await SetError(response, r).ConfigureAwait(false);
+				response.Error = await ReadErrorAsync(r.Content).ConfigureAwait(false);
 			return response;
 		}
 
-		async Task SetError<T>(SafenetResponse<T> response, HttpResponseMessage r) {
-			response.Error = r.Content.Headers.ContentType?.MediaType == "application/json"
-				? Deserialize<SafenetError>(await r.Content.ReadAsStreamAsync().ConfigureAwait(false))
-				: new SafenetError { Description = await r.Content.ReadAsStringAsync().ConfigureAwait(false) };
+		async Task<SafenetError> ReadErrorAsync(HttpContent content) {
+			return content.Headers.ContentType?.MediaType == "application/json"
+				? Deserialize<SafenetError>(await content.ReadAsStreamAsync().ConfigureAwait(false))
+				: new SafenetError { Description = await content.ReadAsStringAsync().ConfigureAwait(false) };
 		}
 
-		static string HeaderOrDefault(HttpHeaders headers, string header, string defaultValue) {
+		static T HeaderOrDefault<T>(HttpHeaders headers, string header, Func<string, T> convert, T defaultValue) {
 			IEnumerable<string> found;
 			if(headers.TryGetValues(header, out found))
-				return found.Single();
+				return convert(found.Single());
 			return defaultValue;
 		}
 

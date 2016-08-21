@@ -1,22 +1,10 @@
 ﻿using System;
 using System.IO;
-using System.Net;
 using System.Net.Http.Headers;
 using Newtonsoft.Json;
 
 namespace Drunkcod.Safenet
 {
-	public class SafenetResponse<T>
-	{
-		public T Response;
-		public SafenetError? Error;
-		public readonly HttpStatusCode StatusCode;
-
-		public SafenetResponse(HttpStatusCode status) {
-			this.StatusCode = status;
-		}
-	}
-
 	public struct SafenetError
 	{
 		[JsonProperty("description")] public string Description;
@@ -79,8 +67,6 @@ namespace Drunkcod.Safenet
 		public ContentRangeHeaderValue ContentRange;
 		public byte[] Metadata;
 	}
-
-	public struct SafenetEmptyResponse { }
 
 	public class SafenetDnsRegisterServiceRequest
 	{
