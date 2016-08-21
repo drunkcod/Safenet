@@ -52,10 +52,19 @@
     <Compile Include="MySafenet.Designer.cs">
       <DependentUpon>MySafenet.cs</DependentUpon>
     </Compile>
+    <Compile Include="NewService.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="NewService.Designer.cs">
+      <DependentUpon>NewService.cs</DependentUpon>
+    </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="MySafenet.resx">
       <DependentUpon>MySafenet.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="NewService.resx">
+      <DependentUpon>NewService.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>

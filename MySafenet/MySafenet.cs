@@ -11,41 +11,88 @@ namespace MySafenet
 	public partial class MySafenet : Form
 	{
 		SafenetClient safe = new SafenetClient();
+		readonly SynchronizationContext ui;
+
 		ContextMenu dnsActions;
+		ContextMenu serviceActions;
 
 		public MySafenet() {
 			InitializeComponent();
+			this.ui = SynchronizationContext.Current;
+		}
+
+		void DnsActions_Delete(object sender, EventArgs e) {
+			var m = (MenuItem)sender;
+			var node = (TreeNode)m.Parent.Tag;
+			if(MessageBox.Show($"You sure you want to unregister '{node.Text}'?", "Delete?", MessageBoxButtons.YesNo) != DialogResult.Yes)
+				return;
+			var deletePublicId = safe.DnsDeleteAsync(node.Text).Result;
+			if(deletePublicId.StatusCode != HttpStatusCode.OK) {
+				MessageBox.Show($"Failed to delete public id '{node.Text}'", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				return;
+			}
+			DnsView.Nodes.Remove(node);
+		}
+
+		void DnsActions_AddService(object sender, EventArgs e) {
+			using(var input = new NewService(safe)) { 
+				if(input.ShowDialog() != DialogResult.OK)
+					return;
+				var m = (MenuItem)sender;
+				var node = (TreeNode)m.Parent.Tag;
+				ThreadPool.QueueUserWorkItem(_ => {
+					var registerService = safe.DnsPutAsync(new SafenetDnsRegisterServiceRequest
+					{
+						LongName = node.Text,
+						ServiceName = input.ServiceName,
+						RootPath = "app",
+						ServiceHomeDirPath = input.ServiceRoot,
+					});
+					if(registerService.Result.StatusCode != HttpStatusCode.OK)
+						MessageBox.Show("Failed to register service", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+					else ui.Post(obj => node.Nodes.Add(obj.ToString()), input.ServiceName);
+				});
+			}
+		}
+
+		void ServiceActions_Delete(object sender, EventArgs e) {
+			var m = (MenuItem)sender;
+			var node = (TreeNode)m.Parent.Tag;
+			if(MessageBox.Show($"You sure you want to delete '{node.Text}'?", "Delete?", MessageBoxButtons.YesNo) != DialogResult.Yes)
+				return;
+			var deleteService = safe.DnsDeleteAsync(node.Text, node.Parent.Text).Result;
+			if(deleteService.StatusCode != HttpStatusCode.OK) {
+				MessageBox.Show($"Failed to delete service '{node.Text}'", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				return;
+			}
+			DnsView.Nodes.Remove(node);
 		}
 
 		private void MySafenet_Load(object sender, EventArgs e) {
+
 			Panel_SizeChanged(LoadingPanel, EventArgs.Empty);
 			Panel_SizeChanged(DnsPanel, EventArgs.Empty);
 
 			dnsActions = new ContextMenu(new [] {
-				new MenuItem("Delete", (s, args) => {
-					var m = (MenuItem)s;
-					var node = (TreeNode)m.Parent.Tag;
-					if(MessageBox.Show($"You sure you want to unregister '{node.Text}'?", "Delete?", MessageBoxButtons.YesNo) != DialogResult.Yes)
-						return;
-					var deletePublicId = safe.DnsDeleteAsync(node.Text).Result;
-					if(deletePublicId.StatusCode != HttpStatusCode.OK) {
-						MessageBox.Show($"Failed to delete public id '{node.Text}'", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
-						return;
-					}
-					DnsView.Nodes.Remove(node);
-				}),
-				new MenuItem("Add Service", (s, args) => {
-
-				}),
+				new MenuItem("Delete", DnsActions_Delete),
+				new MenuItem("Add Service", DnsActions_AddService)
 			});
+
+			serviceActions = new ContextMenu(new [] {
+				new MenuItem("Delete", ServiceActions_Delete),
+			});
+
 			DnsView.NodeMouseClick += (s, args) => {
 				if(args.Button != MouseButtons.Right)
 					return;
-				dnsActions.Tag = args.Node;
-				dnsActions.Show((Control)s, args.Location);
+				if(args.Node.Level == 0) { 
+					dnsActions.Tag = args.Node;
+					dnsActions.Show((Control)s, args.Location);
+				} else {
+					serviceActions.Tag = args.Node;
+					serviceActions.Show((Control)s, args.Location);
+				}
 			};
-
-			var ui = SynchronizationContext.Current;
 
 			ThreadPool.QueueUserWorkItem(state => { 
 				var steps = new [] {

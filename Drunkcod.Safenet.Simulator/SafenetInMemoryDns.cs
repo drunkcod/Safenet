@@ -23,5 +23,9 @@ namespace Drunkcod.Safenet.Simulator
 		public void BindService(string longName, string serviceName) {
 			services[longName].Add(serviceName);
 		}
+
+		public void RemoveService(string serviceName, string longName) {
+			services[longName].Remove(serviceName);
+		}
 	}
 }

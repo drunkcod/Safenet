@@ -78,6 +78,13 @@ namespace Drunkcod.Safenet.Simulator.Controllers
 			return new HttpResponseMessage(HttpStatusCode.OK);
 		}
 
+		[HttpDelete, Route("dns/{serviceName}/{longName}")]
+		public HttpResponseMessage DnsDelete(string serviceName, string longName) {
+			Authorize();
+			dns.RemoveService(serviceName, longName);
+			return new HttpResponseMessage(HttpStatusCode.OK);
+		}
+
 		[HttpGet, Route("nfs/directory/{root}/{*directory?}")]
 		public SafenetDirectoryResponse NfsGetDirectory(string root, string directory = "") {
 			Authorize();

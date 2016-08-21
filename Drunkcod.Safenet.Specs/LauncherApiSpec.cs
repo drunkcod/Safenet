@@ -68,7 +68,7 @@ namespace Drunkcod.Safenet.Specs
 			Check.That(() => safe.AuthGetAsync().Result.StatusCode == HttpStatusCode.Unauthorized);
 		}
 
-		public async Task dns_requires_auth() {
+		public void dns_requires_auth() {
 			Check.That(() => safe.DnsGetAsync().Result.StatusCode == HttpStatusCode.Unauthorized);
 		}
 
@@ -112,7 +112,32 @@ namespace Drunkcod.Safenet.Specs
 			Check.That(() => getServices.Response[0] == "www");
 		}
 
-		public async Task nfs_app_directory_requires_auth() {
+		public async Task dns_delete_service()
+		{
+			await AuthorizeAsync();
+			CreateService("www", "example");
+
+			Check.That(() => safe.DnsDeleteAsync("www", "example").Result.StatusCode == HttpStatusCode.OK);
+
+			var getServices = safe.DnsGetAsync("example").Result; 
+			Check.That(() => getServices.StatusCode == HttpStatusCode.OK);
+			Check.That(() => getServices.Response.Length == 0);
+		}
+
+		private void CreateService(string serviceName, string longName)
+		{
+			Check.That(() => safe.DnsPostAsync("example").Result.StatusCode == HttpStatusCode.OK);
+
+			Check.That(() => safe.DnsPutAsync(new SafenetDnsRegisterServiceRequest
+			{
+				RootPath = "app",
+				LongName = longName,
+				ServiceName = serviceName,
+				ServiceHomeDirPath = "/www"
+			}).Result.StatusCode == HttpStatusCode.OK);
+		}
+
+		public void nfs_app_directory_requires_auth() {
 			Check.That(() => safe.NfsGetDirectoryAsync("app", string.Empty).Result.StatusCode == HttpStatusCode.Unauthorized);
 		}
 
