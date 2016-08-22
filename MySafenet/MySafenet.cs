@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -15,6 +17,8 @@ namespace MySafenet
 	{
 		class ExplorerViewContext
 		{
+			public string RootPath;
+			public string Path;
 			public Func<Task> Refresh = () => Task.FromResult(0);
 			public Stack<Func<Task>> Back = new Stack<Func<Task>>();
 		}
@@ -78,8 +82,12 @@ namespace MySafenet
 		}
 
 		private void MySafenet_Load(object sender, EventArgs e) {
-
-			Panel_SizeChanged(LoadingPanel, EventArgs.Empty);
+			Font = SystemFonts.DefaultFont;
+			WelcomeLabel.Font = new Font(SystemFonts.DefaultFont.FontFamily, 16, FontStyle.Bold);
+			Center(WelcomeLabel);
+			StatusLabel.Font = SystemFonts.StatusFont;
+			WelcomeText.Font = new Font(SystemFonts.DefaultFont.FontFamily, 9, FontStyle.Italic);
+			Center(WelcomeText);
 			Panel_SizeChanged(DnsPanel, EventArgs.Empty);
 
 			dnsActions = new ContextMenu(new [] {
@@ -113,21 +121,22 @@ namespace MySafenet
 				};
 
 				ui.Post(_ => {
-					ConnectionProgres.Step = 1;
-					ConnectionProgres.Maximum = steps.Length;
+					StatusProgress.Step = 1;
+					StatusProgress.Maximum = steps.Length;
 				}, null);
 
 				try { 
 					foreach(var item in steps) {
-						ui.Post(_ => ProgressLabel.Text = item.Key, null);
+						ui.Post(_ => StatusLabel.Text = item.Key, null);
+						
 						item.Value().Wait();
-						ui.Post(_ => ConnectionProgres.PerformStep(), null);
+						ui.Post(_ => StatusProgress.PerformStep(), null);
 					}
 				} catch(AggregateException ex) {
 					MessageBox.Show(ex.InnerException.Message, "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
 					Application.Exit();
 				}
-				ui.Post(_ => ProgressLabel.Text = "Ready.", null);
+				ui.Post(_ => StatusLabel.Text = "Ready.", null);
 			});
 		}
 
@@ -149,8 +158,53 @@ namespace MySafenet
 
 			ExplorerView.Tag = new ExplorerViewContext();
 
+			ExplorerView.AllowDrop = true;
+			ExplorerView.DragEnter += (sender, args) => args.Effect = DragDropEffects.Copy;
+			ExplorerView.DragDrop += ExplorerView_DragDrop; 
+
 			ExplorerView.MouseDoubleClick += ExplorerView_MouseDoubleClick;
 			ExplorerView.KeyPress += ExplorerView_KeyPress;
+		}
+
+		private void ExplorerView_DragDrop(object sender, DragEventArgs e) {
+			var ctx = (ExplorerViewContext)((ListView)sender).Tag;
+			ThreadPool.QueueUserWorkItem(obj => {
+				var uploads = GetFilePaths((string[])obj)
+					.Select(x => UploadFile(x.Key, ctx.RootPath, ctx.Path + "/" + x.Value))
+					.ToArray();
+				Task.WaitAll(uploads);
+				for(var i = 0; i != uploads.Length; ++i) {
+					var r = uploads[i].Result;
+					if(r.StatusCode != HttpStatusCode.OK)
+						MessageBox.Show($"Failed to upload '{uploads[i]}' reason: {r.Error.Value.Description}", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				}
+				ctx.Refresh().Wait();
+			}, e.Data.GetData(DataFormats.FileDrop));
+		}
+
+		static IEnumerable<KeyValuePair<string,string>> GetFilePaths(IEnumerable<string> paths) =>
+			paths.SelectMany(x => GetFilePaths(Path.GetDirectoryName(x), x));
+
+		static IEnumerable<KeyValuePair<string, string>> GetFilePaths(string root, string item) {
+			if (File.Exists(item))
+				yield return new KeyValuePair<string, string>(item, item.Substring(1 + root.Length));
+			else
+				foreach(var x in Directory.EnumerateFileSystemEntries(item))
+				foreach(var y in GetFilePaths(root, x))
+					yield return y;
+		}
+
+		async Task<SafenetResponse> UploadFile(string sourcePath, string rootPath, string destinationPath) {
+			using(var fs = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 15, FileOptions.Asynchronous)) {
+				var bytes = new byte[fs.Length];
+				await fs.ReadAsync(bytes, 0, bytes.Length);
+				return await safe.NfsPostAsync(new SafenetNfsPutFileRequest {
+					RootPath = rootPath,
+					FilePath = destinationPath,
+					ContentType = MediaTypeHeaderValue.Parse("application/octet-stream"),
+					Bytes = bytes,
+				});
+			}
 		}
 
 		void ExplorerView_MouseDoubleClick(object sender, MouseEventArgs e) {
@@ -236,6 +290,9 @@ namespace MySafenet
 			ui.Post(_ => {
 				var ctx = (ExplorerViewContext)ExplorerView.Tag;
 				ctx.Refresh = LoadStorageInfo;
+				ctx.RootPath = string.Empty;
+				ctx.Path = string.Empty;
+				ExplorerPath.Text = string.Empty;
 				ExplorerView.Items.Clear();
 				ExplorerView.Items.Add(MakeViewItem(
 					getDirectory.Response.Info, 0, 
@@ -255,6 +312,9 @@ namespace MySafenet
 			ui.Post(obj => {
 				var ctx = (ExplorerViewContext)ExplorerView.Tag;
 				ctx.Refresh = async () => await LoadDirectoryInfo(root, path);
+				ctx.RootPath = root;
+				ctx.Path = path;
+				ExplorerPath.Text = ctx.Path + "/";
 				ExplorerView.Items.Clear();
 				ExplorerView.Items.AddRange((ListViewItem[])obj);
 			}, dirs.Concat(files).ToArray());
@@ -272,7 +332,6 @@ namespace MySafenet
 		static KeyValuePair<string, Func<Task>> Step(string name, Func<Task> func) => new KeyValuePair<string, Func<Task>>(name, func); 
 
 		void DnsAdd_Click(object sender, EventArgs e) {
-			
 			var createService = safe.DnsPostAsync(NewDnsName.Text).Result;
 			if(createService.StatusCode != HttpStatusCode.OK) { 
 				MessageBox.Show("Failed to register service", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -284,7 +343,10 @@ namespace MySafenet
 		private void Panel_SizeChanged(object sender, EventArgs e) {
 			var c = (Control)sender;
 			foreach(Control item in c.Controls)
-				item.Left = (item.Parent.ClientSize.Width - item.Width) / 2;
+				Center(item);
 		}
+
+		private static void Center(Control item) =>
+			item.Left = (item.Parent.ClientSize.Width - item.Width)/2;
 	}
 }
