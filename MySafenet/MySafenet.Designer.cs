@@ -35,6 +35,7 @@
 			this.ConnectionProgres = new System.Windows.Forms.ProgressBar();
 			this.WelcomeText = new System.Windows.Forms.Label();
 			this.WelcomeLabel = new System.Windows.Forms.Label();
+			this.ExplorerView = new System.Windows.Forms.ListView();
 			this.DnsPanel.SuspendLayout();
 			this.panel1.SuspendLayout();
 			this.LoadingPanel.SuspendLayout();
@@ -48,16 +49,15 @@
 			this.DnsPanel.Controls.Add(this.panel1);
 			this.DnsPanel.Location = new System.Drawing.Point(18, 165);
 			this.DnsPanel.Name = "DnsPanel";
-			this.DnsPanel.Size = new System.Drawing.Size(757, 294);
+			this.DnsPanel.Size = new System.Drawing.Size(379, 294);
 			this.DnsPanel.TabIndex = 8;
-			this.DnsPanel.Visible = false;
 			this.DnsPanel.SizeChanged += new System.EventHandler(this.Panel_SizeChanged);
 			// 
 			// DnsView
 			// 
 			this.DnsView.Anchor = System.Windows.Forms.AnchorStyles.Top;
 			this.DnsView.HideSelection = false;
-			this.DnsView.Location = new System.Drawing.Point(214, 4);
+			this.DnsView.Location = new System.Drawing.Point(25, 4);
 			this.DnsView.Margin = new System.Windows.Forms.Padding(0);
 			this.DnsView.Name = "DnsView";
 			this.DnsView.PathSeparator = ".";
@@ -66,9 +66,10 @@
 			// 
 			// panel1
 			// 
+			this.panel1.Anchor = System.Windows.Forms.AnchorStyles.Top;
 			this.panel1.Controls.Add(this.DnsAdd);
 			this.panel1.Controls.Add(this.NewDnsName);
-			this.panel1.Location = new System.Drawing.Point(214, 259);
+			this.panel1.Location = new System.Drawing.Point(25, 259);
 			this.panel1.Margin = new System.Windows.Forms.Padding(0);
 			this.panel1.Name = "panel1";
 			this.panel1.Size = new System.Drawing.Size(320, 35);
@@ -76,7 +77,7 @@
 			// 
 			// DnsAdd
 			// 
-			this.DnsAdd.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+			this.DnsAdd.Anchor = System.Windows.Forms.AnchorStyles.Top;
 			this.DnsAdd.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
 			this.DnsAdd.Location = new System.Drawing.Point(232, 4);
 			this.DnsAdd.Margin = new System.Windows.Forms.Padding(0);
@@ -152,11 +153,20 @@
 			this.WelcomeLabel.Text = "Welcome to the SAFE Network";
 			this.WelcomeLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
 			// 
+			// ExplorerView
+			// 
+			this.ExplorerView.Location = new System.Drawing.Point(403, 169);
+			this.ExplorerView.Name = "ExplorerView";
+			this.ExplorerView.Size = new System.Drawing.Size(367, 285);
+			this.ExplorerView.TabIndex = 11;
+			this.ExplorerView.UseCompatibleStateImageBehavior = false;
+			// 
 			// MySafenet
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(120F, 120F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Dpi;
 			this.ClientSize = new System.Drawing.Size(782, 461);
+			this.Controls.Add(this.ExplorerView);
 			this.Controls.Add(this.WelcomeLabel);
 			this.Controls.Add(this.LoadingPanel);
 			this.Controls.Add(this.DnsPanel);
@@ -186,6 +196,7 @@
 		private System.Windows.Forms.Panel panel1;
 		private System.Windows.Forms.Button DnsAdd;
 		private System.Windows.Forms.TextBox NewDnsName;
+		private System.Windows.Forms.ListView ExplorerView;
 	}
 }
 
