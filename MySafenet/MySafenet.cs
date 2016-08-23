@@ -1,10 +1,10 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -25,6 +25,7 @@ namespace MySafenet
 
 		SafenetClient safe = new SafenetClient();
 		readonly SynchronizationContext ui;
+		readonly ThreadPoolWorker worker;
 
 		ContextMenu dnsActions;
 		ContextMenu serviceActions;
@@ -32,6 +33,7 @@ namespace MySafenet
 		public MySafenet() {
 			InitializeComponent();
 			this.ui = SynchronizationContext.Current;
+			this.worker = new ThreadPoolWorker();
 		}
 
 		void DnsActions_Delete(object sender, EventArgs e) {
@@ -53,19 +55,20 @@ namespace MySafenet
 					return;
 				var m = (MenuItem)sender;
 				var node = (TreeNode)m.Parent.Tag;
-				ThreadPool.QueueUserWorkItem(_ => {
-					var registerService = safe.DnsPutAsync(new SafenetDnsRegisterServiceRequest
-					{
-						LongName = node.Text,
-						ServiceName = input.ServiceName,
-						RootPath = "app",
-						ServiceHomeDirPath = input.ServiceRoot,
-					});
-					if(registerService.Result.StatusCode != HttpStatusCode.OK)
-						MessageBox.Show("Failed to register service", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
-					else ui.Post(obj => node.Nodes.Add(obj.ToString()), input.ServiceName);
-				});
+				worker.Post(AddService, input, node);
 			}
+		}
+
+		void AddService(NewService input, TreeNode node) {
+			var registerService = safe.DnsPutAsync(new SafenetDnsRegisterServiceRequest {
+					LongName = node.Text,
+					ServiceName = input.ServiceName,
+					RootPath = "app",
+					ServiceHomeDirPath = input.ServiceRoot,
+				});
+			if(registerService.AwaitResult().StatusCode != HttpStatusCode.OK)
+				MessageBox.Show("Failed to register service", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+			else ui.Post(obj => node.Nodes.Add(obj.ToString()), input.ServiceName);
 		}
 
 		void ServiceActions_Delete(object sender, EventArgs e) {
@@ -112,33 +115,32 @@ namespace MySafenet
 			};
 
 			ConfigureExplorerView();
-
-			ThreadPool.QueueUserWorkItem(state => { 
-				var steps = new [] {
+			worker.Post(RunSteps, new [] {
 					Step("Requesting authorization...", RequestAuthorization), 
 					Step("Loading DNS info...", LoadDnsInfo),
 					Step("Preparing Storage Explorer...", LoadStorageInfo)
-				};
-
-				ui.Post(_ => {
-					StatusProgress.Step = 1;
-					StatusProgress.Maximum = steps.Length;
-				}, null);
-
-				try { 
-					foreach(var item in steps) {
-						ui.Post(_ => StatusLabel.Text = item.Key, null);
-						
-						item.Value().Wait();
-						ui.Post(_ => StatusProgress.PerformStep(), null);
-					}
-				} catch(AggregateException ex) {
-					MessageBox.Show(ex.InnerException.Message, "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
-					Application.Exit();
-				}
-				ui.Post(_ => StatusLabel.Text = "Ready.", null);
 			});
 		}
+
+		void RunSteps(KeyValuePair<string,Func<Task>>[] steps) {
+			ui.Post(_ => {
+				StatusProgress.Step = 1;
+				StatusProgress.Maximum = steps.Length;
+			}, null);
+
+			try { 
+				foreach(var item in steps) {
+					ui.Post(_ => StatusLabel.Text = item.Key, null);
+						
+					item.Value().Wait();
+					ui.Post(_ => StatusProgress.PerformStep(), null);
+				}
+			} catch(AggregateException ex) {
+				MessageBox.Show(ex.InnerException.Message, "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				Application.Exit();
+			}
+			ui.Post(_ => StatusLabel.Text = "Ready.", null);
+		} 
 
 		void ConfigureExplorerView() {
 			var explorerImages = new ImageList();
@@ -166,20 +168,36 @@ namespace MySafenet
 			ExplorerView.KeyPress += ExplorerView_KeyPress;
 		}
 
-		private void ExplorerView_DragDrop(object sender, DragEventArgs e) {
-			var ctx = (ExplorerViewContext)((ListView)sender).Tag;
-			ThreadPool.QueueUserWorkItem(obj => {
-				var uploads = GetFilePaths((string[])obj)
-					.Select(x => UploadFile(x.Key, ctx.RootPath, ctx.Path + "/" + x.Value))
-					.ToArray();
-				Task.WaitAll(uploads);
-				for(var i = 0; i != uploads.Length; ++i) {
-					var r = uploads[i].Result;
-					if(r.StatusCode != HttpStatusCode.OK)
-						MessageBox.Show($"Failed to upload '{uploads[i]}' reason: {r.Error.Value.Description}", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
-				}
-				ctx.Refresh().Wait();
-			}, e.Data.GetData(DataFormats.FileDrop));
+		private void ExplorerView_DragDrop(object sender, DragEventArgs e) =>
+			worker.Post(UploadDroppedFiles, 
+				(ExplorerViewContext)((ListView)sender).Tag,
+				(string[])e.Data.GetData(DataFormats.FileDrop));
+
+		void UploadDroppedFiles(ExplorerViewContext ctx, string[] paths) {
+			var knownDirs = new ConcurrentDictionary<string,bool>();
+			var uploads = GetFilePaths(paths)
+				.Select(x => {
+					var targetPath = ctx.Path + "/" + x.Value;
+					var targetDir = Path.GetDirectoryName(targetPath);
+					knownDirs.GetOrAdd(targetDir, key => {
+						if(!safe.DirectoryExists(ctx.RootPath, key))
+							safe.NfsPostAsync(new SafenetNfsCreateDirectoryRequest {
+								RootPath = ctx.RootPath,
+								DirectoryPath = key,
+								IsPrivate = false,
+							}).AwaitResult();
+						return true;
+					});
+					return safe.UploadFileAsync(x.Key, ctx.RootPath, targetPath);
+				})
+				.ToArray();
+			Task.WaitAll(uploads);
+			for(var i = 0; i != uploads.Length; ++i) {
+				var r = uploads[i].AwaitResponse();
+				if(r.StatusCode != HttpStatusCode.OK)
+					MessageBox.Show($"Failed to upload '{uploads[i]}' reason: {r.Error.Value.Description}", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+			}
+			ctx.Refresh().Wait();
 		}
 
 		static IEnumerable<KeyValuePair<string,string>> GetFilePaths(IEnumerable<string> paths) =>
@@ -192,19 +210,6 @@ namespace MySafenet
 				foreach(var x in Directory.EnumerateFileSystemEntries(item))
 				foreach(var y in GetFilePaths(root, x))
 					yield return y;
-		}
-
-		async Task<SafenetResponse> UploadFile(string sourcePath, string rootPath, string destinationPath) {
-			using(var fs = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 15, FileOptions.Asynchronous)) {
-				var bytes = new byte[fs.Length];
-				await fs.ReadAsync(bytes, 0, bytes.Length);
-				return await safe.NfsPostAsync(new SafenetNfsPutFileRequest {
-					RootPath = rootPath,
-					FilePath = destinationPath,
-					ContentType = MediaTypeHeaderValue.Parse("application/octet-stream"),
-					Bytes = bytes,
-				});
-			}
 		}
 
 		void ExplorerView_MouseDoubleClick(object sender, MouseEventArgs e) {
@@ -223,7 +228,7 @@ namespace MySafenet
 					var ctx = (ExplorerViewContext)view.Tag;
 					if(ctx.Back.Count == 0)
 						break;
-					ThreadPool.QueueUserWorkItem(x => ((Func<Task>)x)().Wait(), ctx.Back.Pop());
+					worker.Post(x => x().AwaitResult(), ctx.Back.Pop());
 					e.Handled = true;
 					break;
 			}
@@ -237,7 +242,7 @@ namespace MySafenet
 				return false;
 			var ctx = (ExplorerViewContext)sender.Tag;
 			ctx.Back.Push(ctx.Refresh);
-			ThreadPool.QueueUserWorkItem(x => ((Func<Task>)x)().Wait(), sender.SelectedItems[0].Tag);
+			worker.Post(x => x().AwaitResult(), (Func<Task>)sender.SelectedItems[0].Tag);
 			return true;
 		}
 
@@ -266,9 +271,8 @@ namespace MySafenet
 					DnsView.Enabled = false;
 				foreach(var item in dnsEntries) {
 					var node = DnsView.Nodes.Add(item);
-					ThreadPool.QueueUserWorkItem(n => {
-						var target = (TreeNode)n;
-						var getServices = safe.DnsGetAsync(target.Text).Result;
+					worker.Post(target => {
+						var getServices = safe.DnsGetAsync(target.Text).AwaitResult();
 						if(getServices.StatusCode == HttpStatusCode.OK) {
 							ui.Post(_ => {
 								foreach(var service in getServices.Response)
@@ -348,5 +352,6 @@ namespace MySafenet
 
 		private static void Center(Control item) =>
 			item.Left = (item.Parent.ClientSize.Width - item.Width)/2;
+
 	}
 }

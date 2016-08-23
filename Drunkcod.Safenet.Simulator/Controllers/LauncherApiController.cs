@@ -102,6 +102,12 @@ namespace Drunkcod.Safenet.Simulator.Controllers
 			};
 		}
 
+		[HttpHead, Route("nfs/directory/{root}/{*directory?}")]
+		public HttpResponseMessage NfsHeadDirectory(string root, string directory = "") {
+			Authorize();
+			return new HttpResponseMessage(fs.DirectoryExists(Path.Combine(root, directory)) ? HttpStatusCode.OK : HttpStatusCode.NotFound);
+		}
+
 		[HttpPost, Route("nfs/directory/{root}/{*directory}")]
 		public HttpResponseMessage NfsCreateDirectory(string root, string directory, [FromBody] SafenetNfsCreateDirectoryRequest dir) {
 			var newDir = fs.GetOrCreateDirectory(Path.Combine(root, directory));

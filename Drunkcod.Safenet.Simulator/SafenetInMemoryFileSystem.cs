@@ -26,6 +26,16 @@ namespace Drunkcod.Safenet.Simulator
 			return dir;
 		}
 
+		public bool DirectoryExists(string path) {
+			var parts = path.Split(new [] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
+			var dir = root;
+			for(var i = 0; i != parts.Length; ++i)
+				if(!dir.TryGetDirectory(parts[i], out dir))
+					return false;
+			return true;
+		}
+
+
 		public void Clear() => root.Clear();
 	}
 
@@ -37,6 +47,9 @@ namespace Drunkcod.Safenet.Simulator
 		public SafenetDirectoryInfo Info;
 		public IEnumerable<SafenetInMemoryDirectory> SubDirectories => directories.Values;
 		public IEnumerable<SafenetInMemorFile> Files => files.Values;
+
+		public bool TryGetDirectory(string path, out SafenetInMemoryDirectory found) =>
+			directories.TryGetValue(path, out found);
 
 		public SafenetInMemoryDirectory GetOrCreateDirectory(string path) {
 			return directories.GetOrAdd(path, _ => new SafenetInMemoryDirectory

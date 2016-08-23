@@ -170,6 +170,21 @@ namespace Drunkcod.Safenet.Specs
 				x => x.Response.Info.IsPrivate == false);
 		}
 
+		public async Task nfs_check_directory_exists() {
+			await AuthorizeAsync();
+
+			Check.That(() => safe.NfsHeadDirectoryAsync("app", "test").Result == HttpStatusCode.NotFound);
+
+			Assume.That(() => safe.NfsPostAsync(new SafenetNfsCreateDirectoryRequest {
+				RootPath = "app",
+				DirectoryPath = "test",
+				IsPrivate = false,
+			}).Result.StatusCode == HttpStatusCode.OK);
+
+			Check.That(() => safe.NfsHeadDirectoryAsync("app", "test").Result == HttpStatusCode.OK);
+
+		}
+
 		public async Task nfs_get_subdirectory() {
 			await AuthorizeAsync();
 			Check.That(() => safe.NfsPostAsync(new SafenetNfsCreateDirectoryRequest {

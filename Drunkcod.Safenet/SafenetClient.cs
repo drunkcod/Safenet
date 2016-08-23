@@ -71,6 +71,9 @@ namespace Drunkcod.Safenet
 		public Task<SafenetResponse<SafenetDirectoryResponse>> NfsGetDirectoryAsync(string rootPath, string directoryPath) =>
 			ReadResponseAsync<SafenetDirectoryResponse>(http.GetAsync($"/nfs/directory/{rootPath}/{directoryPath}")); 
 
+		public async Task<HttpStatusCode> NfsHeadDirectoryAsync(string rootPath, string directoryPath) =>
+			(await http.SendAsync(new HttpRequestMessage(HttpMethod.Head, $"/nfs/directory/{rootPath}/{directoryPath}"))).StatusCode;
+
 		public Task<SafenetResponse<SafenetFileResponse>> NfsGetFileAsync(string rootPath, string filePath) => 
 			FileResponseAsync(http.GetAsync($"/nfs/file/{rootPath}/{WebUtility.UrlEncode(filePath)}")); 
 
