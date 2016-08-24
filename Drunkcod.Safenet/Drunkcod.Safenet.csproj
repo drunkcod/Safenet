@@ -50,6 +50,7 @@
     <Compile Include="SafenetClient.cs" />
     <Compile Include="SafenetClientExtensions.cs" />
     <Compile Include="SafenetResponse.cs" />
+    <Compile Include="TaskExtensions.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

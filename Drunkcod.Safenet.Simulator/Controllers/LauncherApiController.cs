@@ -115,6 +115,12 @@ namespace Drunkcod.Safenet.Simulator.Controllers
 			return new HttpResponseMessage(HttpStatusCode.OK);
 		}
 
+		[HttpDelete, Route("nfs/directory/{root}/{*directory?}")]
+		public HttpResponseMessage NfsDeleteDirectory(string root, string directory) {
+			fs.DeleteDirectory(Path.Combine(root, directory));
+			return new HttpResponseMessage(HttpStatusCode.OK);
+		}
+
 		[HttpGet, Route("nfs/file/{root}/{*path}")]
 		public HttpResponseMessage NfsGetFile(string root, string path) {
 			var sourceDir = fs.GetOrCreateDirectory(Path.Combine(root, Path.GetDirectoryName(path)));

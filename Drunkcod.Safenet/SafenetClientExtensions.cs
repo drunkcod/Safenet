@@ -1,4 +1,7 @@
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
@@ -25,20 +28,34 @@ namespace Drunkcod.Safenet
 				return bytes;
 			}
 		}
-	}
 
-	public static class TaskExtensions
-	{
-		public static void AwaitResult(this Task self) => 
-			self.ConfigureAwait(false).GetAwaiter().GetResult();
+		public static Task<KeyValuePair<string, SafenetResponse>[]> UploadPathsAsync(this SafenetClient self, IEnumerable<string> sourcePaths, string rootPath, string destinationPath) {
+			var knownDirs = new ConcurrentDictionary<string,bool>();
+			return Task.WhenAll(GetFilePaths(sourcePaths).Select(async x => {
+				var targetPath = destinationPath + "/" + x.Value;
+				knownDirs.GetOrAdd(Path.GetDirectoryName(targetPath), key => {
+					if(!self.DirectoryExists(rootPath, key))
+						self.NfsPostAsync(new SafenetNfsCreateDirectoryRequest {
+							RootPath = rootPath,
+							DirectoryPath = key,
+							IsPrivate = false,
+						}).AwaitResult();
+					return true;
+				});
+				return new KeyValuePair<string, SafenetResponse>(x.Key, await self.UploadFileAsync(x.Key, rootPath, targetPath));
+			}));
+		} 
 
-		public static T AwaitResult<T>(this Task<T> self) => 
-			self.ConfigureAwait(false).GetAwaiter().GetResult();
+		static IEnumerable<KeyValuePair<string,string>> GetFilePaths(IEnumerable<string> paths) =>
+			paths.SelectMany(x => GetFilePaths(Path.GetDirectoryName(x), x));
 
-		public static SafenetResponse AwaitResponse(this Task<SafenetResponse> self) =>
-			self.AwaitResult();
-
-		public static T AwaitResponse<T>(this Task<SafenetResponse<T>> self) =>
-			self.AwaitResult().Response;
+		static IEnumerable<KeyValuePair<string, string>> GetFilePaths(string root, string item) {
+			if (File.Exists(item))
+				yield return new KeyValuePair<string, string>(item, item.Substring(1 + root.Length));
+			else
+				foreach(var x in Directory.EnumerateFileSystemEntries(item))
+				foreach(var y in GetFilePaths(root, x))
+					yield return y;
+		}
 	}
 }

@@ -175,13 +175,17 @@ namespace Drunkcod.Safenet.Specs
 
 			Check.That(() => safe.NfsHeadDirectoryAsync("app", "test").Result == HttpStatusCode.NotFound);
 
-			Assume.That(() => safe.NfsPostAsync(new SafenetNfsCreateDirectoryRequest {
-				RootPath = "app",
-				DirectoryPath = "test",
-				IsPrivate = false,
-			}).Result.StatusCode == HttpStatusCode.OK);
+			CreateDirectory("app", "test");
 
 			Check.That(() => safe.NfsHeadDirectoryAsync("app", "test").Result == HttpStatusCode.OK);
+		}
+
+		public async Task nfs_delete_directory() {
+			await AuthorizeAsync();
+			CreateDirectory("app", "test");
+
+			Check.That(() => safe.NfsDeleteDirectoryAsync("app", "test").Result.StatusCode == HttpStatusCode.OK);
+			Check.That(() => !safe.DirectoryExists("app", "test"));
 
 		}
 
@@ -268,6 +272,14 @@ namespace Drunkcod.Safenet.Specs
 				() => auth.StatusCode == HttpStatusCode.OK,
 				() => !string.IsNullOrEmpty(auth.Response.Token));
 			safe.SetToken(auth.Response.Token);
+		}
+
+		void CreateDirectory(string rootPath, string directoryPath) {
+			Assume.That(() => safe.NfsPostAsync(new SafenetNfsCreateDirectoryRequest {
+				RootPath = rootPath,
+				DirectoryPath = directoryPath,
+				IsPrivate = false,
+			}).Result.StatusCode == HttpStatusCode.OK);
 		}
 
 		static SafenetAuthRequest MakeTestAppAuthRequest() =>

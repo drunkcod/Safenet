@@ -35,6 +35,14 @@ namespace Drunkcod.Safenet.Simulator
 			return true;
 		}
 
+		public bool DeleteDirectory(string path) {
+			var parts = path.Split(new [] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
+			var dir = root;
+			for(var i = 0; i != parts.Length - 1; ++i)
+				if(!dir.TryGetDirectory(parts[i], out dir))
+					return false;
+			return dir.DeleteDirectory(parts[parts.Length - 1]);
+		}
 
 		public void Clear() => root.Clear();
 	}
@@ -75,6 +83,11 @@ namespace Drunkcod.Safenet.Simulator
 		public void Clear() {
 			directories.Clear();
 			files.Clear();
+		}
+
+		public bool DeleteDirectory(string s) { 
+			SafenetInMemoryDirectory dir;
+			return directories.TryRemove(s, out dir);
 		}
 	}
 

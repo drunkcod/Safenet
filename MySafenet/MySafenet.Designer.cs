@@ -35,8 +35,9 @@
 			this.ExplorerView = new System.Windows.Forms.ListView();
 			this.ExplorerPath = new System.Windows.Forms.Label();
 			this.StatusStrip = new System.Windows.Forms.StatusStrip();
-			this.StatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
 			this.StatusProgress = new System.Windows.Forms.ToolStripProgressBar();
+			this.StatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
+			this.DnsLabel = new System.Windows.Forms.Label();
 			this.DnsPanel.SuspendLayout();
 			this.panel1.SuspendLayout();
 			this.StatusStrip.SuspendLayout();
@@ -47,22 +48,23 @@
 			this.DnsPanel.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
 			this.DnsPanel.Controls.Add(this.DnsView);
+			this.DnsPanel.Controls.Add(this.DnsLabel);
 			this.DnsPanel.Controls.Add(this.panel1);
 			this.DnsPanel.Location = new System.Drawing.Point(18, 64);
 			this.DnsPanel.Name = "DnsPanel";
-			this.DnsPanel.Size = new System.Drawing.Size(379, 382);
+			this.DnsPanel.Size = new System.Drawing.Size(348, 382);
 			this.DnsPanel.TabIndex = 8;
-			this.DnsPanel.SizeChanged += new System.EventHandler(this.Panel_SizeChanged);
+			this.DnsPanel.SizeChanged += new System.EventHandler(this.CenterChildControls);
 			// 
 			// DnsView
 			// 
 			this.DnsView.Anchor = System.Windows.Forms.AnchorStyles.Top;
 			this.DnsView.HideSelection = false;
-			this.DnsView.Location = new System.Drawing.Point(27, 22);
+			this.DnsView.Location = new System.Drawing.Point(12, 51);
 			this.DnsView.Margin = new System.Windows.Forms.Padding(0);
 			this.DnsView.Name = "DnsView";
 			this.DnsView.PathSeparator = ".";
-			this.DnsView.Size = new System.Drawing.Size(320, 307);
+			this.DnsView.Size = new System.Drawing.Size(320, 287);
 			this.DnsView.TabIndex = 8;
 			// 
 			// panel1
@@ -70,7 +72,7 @@
 			this.panel1.Anchor = System.Windows.Forms.AnchorStyles.Top;
 			this.panel1.Controls.Add(this.DnsAdd);
 			this.panel1.Controls.Add(this.NewDnsName);
-			this.panel1.Location = new System.Drawing.Point(27, 338);
+			this.panel1.Location = new System.Drawing.Point(12, 338);
 			this.panel1.Margin = new System.Windows.Forms.Padding(0);
 			this.panel1.Name = "panel1";
 			this.panel1.Size = new System.Drawing.Size(320, 35);
@@ -92,9 +94,10 @@
 			// NewDnsName
 			// 
 			this.NewDnsName.Anchor = System.Windows.Forms.AnchorStyles.Top;
-			this.NewDnsName.Location = new System.Drawing.Point(2, 4);
+			this.NewDnsName.Location = new System.Drawing.Point(0, 7);
+			this.NewDnsName.Margin = new System.Windows.Forms.Padding(0);
 			this.NewDnsName.Name = "NewDnsName";
-			this.NewDnsName.Size = new System.Drawing.Size(222, 27);
+			this.NewDnsName.Size = new System.Drawing.Size(222, 23);
 			this.NewDnsName.TabIndex = 11;
 			// 
 			// WelcomeText
@@ -103,7 +106,7 @@
 			this.WelcomeText.AutoSize = true;
 			this.WelcomeText.Location = new System.Drawing.Point(20, 34);
 			this.WelcomeText.Name = "WelcomeText";
-			this.WelcomeText.Size = new System.Drawing.Size(628, 20);
+			this.WelcomeText.Size = new System.Drawing.Size(500, 15);
 			this.WelcomeText.TabIndex = 4;
 			this.WelcomeText.Text = "Make Sure the SAFE Network Launcher is available and grant access to MySafenet wh" +
     "en asked";
@@ -121,9 +124,9 @@
 			// 
 			// ExplorerView
 			// 
-			this.ExplorerView.Location = new System.Drawing.Point(403, 86);
+			this.ExplorerView.Location = new System.Drawing.Point(372, 86);
 			this.ExplorerView.Name = "ExplorerView";
-			this.ExplorerView.Size = new System.Drawing.Size(367, 360);
+			this.ExplorerView.Size = new System.Drawing.Size(390, 346);
 			this.ExplorerView.TabIndex = 11;
 			this.ExplorerView.UseCompatibleStateImageBehavior = false;
 			// 
@@ -131,9 +134,9 @@
 			// 
 			this.ExplorerPath.AutoSize = true;
 			this.ExplorerPath.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-			this.ExplorerPath.Location = new System.Drawing.Point(403, 64);
+			this.ExplorerPath.Location = new System.Drawing.Point(372, 64);
 			this.ExplorerPath.Name = "ExplorerPath";
-			this.ExplorerPath.Size = new System.Drawing.Size(14, 20);
+			this.ExplorerPath.Size = new System.Drawing.Size(12, 17);
 			this.ExplorerPath.TabIndex = 12;
 			this.ExplorerPath.Text = "/";
 			// 
@@ -151,12 +154,6 @@
 			this.StatusStrip.SizingGrip = false;
 			this.StatusStrip.TabIndex = 13;
 			// 
-			// StatusLabel
-			// 
-			this.StatusLabel.Name = "StatusLabel";
-			this.StatusLabel.Size = new System.Drawing.Size(187, 20);
-			this.StatusLabel.Text = "Welcome to SAFE Network";
-			// 
 			// StatusProgress
 			// 
 			this.StatusProgress.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right;
@@ -164,10 +161,24 @@
 			this.StatusProgress.Name = "StatusProgress";
 			this.StatusProgress.Size = new System.Drawing.Size(150, 19);
 			// 
+			// StatusLabel
+			// 
+			this.StatusLabel.Name = "StatusLabel";
+			this.StatusLabel.Size = new System.Drawing.Size(148, 20);
+			this.StatusLabel.Text = "Welcome to SAFE Network";
+			// 
+			// DnsLabel
+			// 
+			this.DnsLabel.AutoSize = true;
+			this.DnsLabel.Location = new System.Drawing.Point(139, 22);
+			this.DnsLabel.Name = "DnsLabel";
+			this.DnsLabel.Size = new System.Drawing.Size(79, 15);
+			this.DnsLabel.TabIndex = 14;
+			this.DnsLabel.Text = "My Public IDs";
+			// 
 			// MySafenet
 			// 
-			this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 20F);
-			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
 			this.BackColor = System.Drawing.SystemColors.Window;
 			this.ClientSize = new System.Drawing.Size(782, 471);
 			this.Controls.Add(this.WelcomeText);
@@ -183,6 +194,7 @@
 			this.Text = "MySafenet";
 			this.Load += new System.EventHandler(this.MySafenet_Load);
 			this.DnsPanel.ResumeLayout(false);
+			this.DnsPanel.PerformLayout();
 			this.panel1.ResumeLayout(false);
 			this.panel1.PerformLayout();
 			this.StatusStrip.ResumeLayout(false);
@@ -205,6 +217,7 @@
 		private System.Windows.Forms.StatusStrip StatusStrip;
 		private System.Windows.Forms.ToolStripStatusLabel StatusLabel;
 		private System.Windows.Forms.ToolStripProgressBar StatusProgress;
+		private System.Windows.Forms.Label DnsLabel;
 	}
 }
 

@@ -23,7 +23,13 @@ namespace MySafenet
 			public Stack<Func<Task>> Back = new Stack<Func<Task>>();
 		}
 
-		SafenetClient safe = new SafenetClient();
+		class ExplorerViewItem
+		{
+			public Func<Task> Enter;
+			public Func<Task> Delete;
+		}
+
+		readonly SafenetClient safe = new SafenetClient();
 		readonly SynchronizationContext ui;
 		readonly ThreadPoolWorker worker;
 
@@ -41,7 +47,7 @@ namespace MySafenet
 			var node = (TreeNode)m.Parent.Tag;
 			if(MessageBox.Show($"You sure you want to unregister '{node.Text}'?", "Delete?", MessageBoxButtons.YesNo) != DialogResult.Yes)
 				return;
-			var deletePublicId = safe.DnsDeleteAsync(node.Text).Result;
+			var deletePublicId = safe.DnsDeleteAsync(node.Text).AwaitResult();
 			if(deletePublicId.StatusCode != HttpStatusCode.OK) {
 				MessageBox.Show($"Failed to delete public id '{node.Text}'", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
 				return;
@@ -54,18 +60,17 @@ namespace MySafenet
 				if(input.ShowDialog() != DialogResult.OK)
 					return;
 				var m = (MenuItem)sender;
-				var node = (TreeNode)m.Parent.Tag;
-				worker.Post(AddService, input, node);
+				worker.Post(AddService, input, (TreeNode)m.Parent.Tag);
 			}
 		}
 
 		void AddService(NewService input, TreeNode node) {
 			var registerService = safe.DnsPutAsync(new SafenetDnsRegisterServiceRequest {
-					LongName = node.Text,
-					ServiceName = input.ServiceName,
-					RootPath = "app",
-					ServiceHomeDirPath = input.ServiceRoot,
-				});
+				LongName = node.Text,
+				ServiceName = input.ServiceName,
+				RootPath = "app",
+				ServiceHomeDirPath = input.ServiceRoot,
+			});
 			if(registerService.AwaitResult().StatusCode != HttpStatusCode.OK)
 				MessageBox.Show("Failed to register service", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
 			else ui.Post(obj => node.Nodes.Add(obj.ToString()), input.ServiceName);
@@ -76,7 +81,7 @@ namespace MySafenet
 			var node = (TreeNode)m.Parent.Tag;
 			if(MessageBox.Show($"You sure you want to delete '{node.Text}'?", "Delete?", MessageBoxButtons.YesNo) != DialogResult.Yes)
 				return;
-			var deleteService = safe.DnsDeleteAsync(node.Text, node.Parent.Text).Result;
+			var deleteService = safe.DnsDeleteAsync(node.Text, node.Parent.Text).AwaitResult();
 			if(deleteService.StatusCode != HttpStatusCode.OK) {
 				MessageBox.Show($"Failed to delete service '{node.Text}'", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
 				return;
@@ -90,8 +95,15 @@ namespace MySafenet
 			Center(WelcomeLabel);
 			StatusLabel.Font = SystemFonts.StatusFont;
 			WelcomeText.Font = new Font(SystemFonts.DefaultFont.FontFamily, 9, FontStyle.Italic);
+
+			DnsAdd.Font = SystemFonts.DefaultFont;
+			NewDnsName.Font = SystemFonts.DefaultFont;
+			DnsLabel.Font = new Font(SystemFonts.DefaultFont.FontFamily, 12, FontStyle.Bold);
+			NewDnsName.Height = DnsAdd.Height;
+			DnsAdd.TextAlign = ContentAlignment.MiddleCenter;
+			CenterChildControls(DnsPanel, EventArgs.Empty);
+
 			Center(WelcomeText);
-			Panel_SizeChanged(DnsPanel, EventArgs.Empty);
 
 			dnsActions = new ContextMenu(new [] {
 				new MenuItem("Delete", DnsActions_Delete),
@@ -116,9 +128,9 @@ namespace MySafenet
 
 			ConfigureExplorerView();
 			worker.Post(RunSteps, new [] {
-					Step("Requesting authorization...", RequestAuthorization), 
-					Step("Loading DNS info...", LoadDnsInfo),
-					Step("Preparing Storage Explorer...", LoadStorageInfo)
+				Step("Requesting authorization...", RequestAuthorization), 
+				Step("Loading DNS info...", LoadDnsInfo),
+				Step("Preparing Storage Explorer...", LoadStorageInfo)
 			});
 		}
 
@@ -165,7 +177,7 @@ namespace MySafenet
 			ExplorerView.DragDrop += ExplorerView_DragDrop; 
 
 			ExplorerView.MouseDoubleClick += ExplorerView_MouseDoubleClick;
-			ExplorerView.KeyPress += ExplorerView_KeyPress;
+			ExplorerView.KeyDown += ExplorerView_KeyDown;
 		}
 
 		private void ExplorerView_DragDrop(object sender, DragEventArgs e) =>
@@ -174,42 +186,10 @@ namespace MySafenet
 				(string[])e.Data.GetData(DataFormats.FileDrop));
 
 		void UploadDroppedFiles(ExplorerViewContext ctx, string[] paths) {
-			var knownDirs = new ConcurrentDictionary<string,bool>();
-			var uploads = GetFilePaths(paths)
-				.Select(x => {
-					var targetPath = ctx.Path + "/" + x.Value;
-					var targetDir = Path.GetDirectoryName(targetPath);
-					knownDirs.GetOrAdd(targetDir, key => {
-						if(!safe.DirectoryExists(ctx.RootPath, key))
-							safe.NfsPostAsync(new SafenetNfsCreateDirectoryRequest {
-								RootPath = ctx.RootPath,
-								DirectoryPath = key,
-								IsPrivate = false,
-							}).AwaitResult();
-						return true;
-					});
-					return safe.UploadFileAsync(x.Key, ctx.RootPath, targetPath);
-				})
-				.ToArray();
-			Task.WaitAll(uploads);
-			for(var i = 0; i != uploads.Length; ++i) {
-				var r = uploads[i].AwaitResponse();
-				if(r.StatusCode != HttpStatusCode.OK)
-					MessageBox.Show($"Failed to upload '{uploads[i]}' reason: {r.Error.Value.Description}", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
-			}
+			var uploads = safe.UploadPathsAsync(paths, ctx.RootPath, ctx.Path).AwaitResult();
+			foreach(var item in uploads.Where(x => x.Value.StatusCode != HttpStatusCode.OK))
+				MessageBox.Show($"Failed to upload '{item.Key}' reason: {item.Value.Error.Value.Description}", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
 			ctx.Refresh().Wait();
-		}
-
-		static IEnumerable<KeyValuePair<string,string>> GetFilePaths(IEnumerable<string> paths) =>
-			paths.SelectMany(x => GetFilePaths(Path.GetDirectoryName(x), x));
-
-		static IEnumerable<KeyValuePair<string, string>> GetFilePaths(string root, string item) {
-			if (File.Exists(item))
-				yield return new KeyValuePair<string, string>(item, item.Substring(1 + root.Length));
-			else
-				foreach(var x in Directory.EnumerateFileSystemEntries(item))
-				foreach(var y in GetFilePaths(root, x))
-					yield return y;
 		}
 
 		void ExplorerView_MouseDoubleClick(object sender, MouseEventArgs e) {
@@ -218,18 +198,21 @@ namespace MySafenet
 			ActivateSelected((ListView)sender);
 		}
 
-		void ExplorerView_KeyPress(object sender, KeyPressEventArgs e) {
+		void ExplorerView_KeyDown(object sender, KeyEventArgs e) {
 			var view = (ListView)sender;
-			switch(e.KeyChar) {
-				case (char)Keys.Return:
+			switch(e.KeyCode) {
+				case Keys.Return:
 					e.Handled = ActivateSelected(view);
 					break;
-				case (char)Keys.Back:
+				case Keys.Back:
 					var ctx = (ExplorerViewContext)view.Tag;
 					if(ctx.Back.Count == 0)
 						break;
 					worker.Post(x => x().AwaitResult(), ctx.Back.Pop());
 					e.Handled = true;
+					break;
+				case Keys.Delete: 
+					e.Handled = DeleteSelected(view);
 					break;
 			}
 		}
@@ -238,11 +221,27 @@ namespace MySafenet
 			if(sender.SelectedItems.Count != 1)
 				return false;
 			var item = sender.SelectedItems[0];
-			if(item.Tag == null)
+			var itemTag = (ExplorerViewItem) item.Tag;
+			if(itemTag?.Enter == null)
 				return false;
+
 			var ctx = (ExplorerViewContext)sender.Tag;
 			ctx.Back.Push(ctx.Refresh);
-			worker.Post(x => x().AwaitResult(), (Func<Task>)sender.SelectedItems[0].Tag);
+			worker.Post(x => x().AwaitResult(), itemTag.Enter);
+			return true;
+		}
+
+		bool DeleteSelected(ListView sender) {
+			foreach(ListViewItem item in sender.SelectedItems) { 
+				var itemTag = (ExplorerViewItem) item.Tag;
+				if(itemTag?.Delete == null)
+					continue;
+
+				worker.Post(x => {
+					x().AwaitResult();
+					ui.Post(_ => sender.Items.Remove(item), null);
+				}, itemTag.Delete);
+			}
 			return true;
 		}
 
@@ -300,19 +299,21 @@ namespace MySafenet
 				ExplorerView.Items.Clear();
 				ExplorerView.Items.Add(MakeViewItem(
 					getDirectory.Response.Info, 0, 
-					() => LoadDirectoryInfo("app", "")));
+					new ExplorerViewItem { Enter = () => LoadDirectoryInfo("app", "") }));
 			}, null);
 		}
 
 		async Task LoadDirectoryInfo(string root, string path) {
 			var getDirectory = await safe.NfsGetDirectoryAsync(root, path);
 			var dirs = Array.ConvertAll(getDirectory.Response.SubDirectories, x =>
-				MakeViewItem(x, 1, () => LoadDirectoryInfo("app", path + "/" + x.Name)));
-			var files = Array.ConvertAll(getDirectory.Response.Files, x => {
-				var item = new ListViewItem(x.Name, 2);
-				item.SubItems.Add(x.ModifiedOn.ToString());
-				return item;
-			});
+				MakeViewItem(x, 1, new ExplorerViewItem {
+					Enter = () => LoadDirectoryInfo(root, path + "/" + x.Name),
+					Delete = () => safe.NfsDeleteDirectoryAsync(root, path + "/" + x.Name)
+				}));
+			var files = Array.ConvertAll(getDirectory.Response.Files, x => 
+				MakeViewItem(x, new ExplorerViewItem {
+					Delete = () => safe.NfsDeleteFileAsync(root, path + "/" + x.Name),
+				}));
 			ui.Post(obj => {
 				var ctx = (ExplorerViewContext)ExplorerView.Tag;
 				ctx.Refresh = async () => await LoadDirectoryInfo(root, path);
@@ -324,12 +325,19 @@ namespace MySafenet
 			}, dirs.Concat(files).ToArray());
 		}
 
-		ListViewItem MakeViewItem(SafenetDirectoryInfo x, int img, Func<Task> refresh) {
+		static ListViewItem MakeViewItem(SafenetDirectoryInfo x, int img, ExplorerViewItem tag) {
 			var item = new ListViewItem(x.Name, img);
 			item.SubItems.Add(x.ModifiedOn.ToString());
 			if (x.IsPrivate)
 				item.SubItems.Add("✓");
-			item.Tag = refresh;
+			item.Tag = tag;
+			return item;
+		}
+
+		static ListViewItem MakeViewItem(SafenetFileInfo x, ExplorerViewItem tag) {
+			var item = new ListViewItem(x.Name, 2);
+			item.SubItems.Add(x.ModifiedOn.ToString());
+			item.Tag = tag;
 			return item;
 		}
 
@@ -344,14 +352,13 @@ namespace MySafenet
 			DnsView.Nodes.Add(NewDnsName.Text);
 		}
 
-		private void Panel_SizeChanged(object sender, EventArgs e) {
+		private void CenterChildControls(object sender, EventArgs e) {
 			var c = (Control)sender;
 			foreach(Control item in c.Controls)
 				Center(item);
 		}
 
 		private static void Center(Control item) =>
-			item.Left = (item.Parent.ClientSize.Width - item.Width)/2;
-
+			item.Left = (item.Parent.ClientSize.Width - item.Width) / 2;
 	}
 }
