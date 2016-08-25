@@ -1,3 +1,4 @@
+using System.Net;
 using System.Threading.Tasks;
 
 namespace Drunkcod.Safenet
@@ -15,5 +16,11 @@ namespace Drunkcod.Safenet
 
 		public static T AwaitResponse<T>(this Task<SafenetResponse<T>> self) =>
 			self.AwaitResult().Response;
+
+		public static void EnsureSuccess(this Task<SafenetResponse> self) {
+			var r = self.AwaitResponse();
+			if(r.StatusCode != HttpStatusCode.OK)
+				throw new SafenetErrorException(r.StatusCode, r.Error.Value);
+		}
 	}
 }

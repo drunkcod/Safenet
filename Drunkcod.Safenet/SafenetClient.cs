@@ -1,10 +1,12 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 
@@ -18,6 +20,7 @@ namespace Drunkcod.Safenet
 		public SafenetClient(string apiRoot = "http://localhost:8100") {
 			this.http = new HttpClient {
 				BaseAddress = new Uri(apiRoot),
+				Timeout = TimeSpan.FromDays(1),
 			};
 			this.json = new JsonSerializer();
 		}
@@ -78,16 +81,51 @@ namespace Drunkcod.Safenet
 			FileResponseAsync(http.GetAsync($"/nfs/file/{rootPath}/{WebUtility.UrlEncode(filePath)}")); 
 
 		public Task<SafenetResponse> NfsPostAsync(SafenetNfsCreateDirectoryRequest directory) =>
-			EmptyResponseAsync(http.PostAsync($"/nfs/directory/{directory.RootPath}/{directory.DirectoryPath}", ToPayload(new {
-				isPrivate = directory.IsPrivate,
-				metadata = Convert.ToBase64String(directory.Metadata),
-			})));
+			NfsLock(
+				directory.RootPath + directory.DirectoryPath,
+				() => EmptyResponseAsync(http.PostAsync($"/nfs/directory/{directory.RootPath}/{directory.DirectoryPath}", ToPayload(new {
+					isPrivate = directory.IsPrivate,
+					metadata = Convert.ToBase64String(directory.Metadata),
+				}))));
 
 		public Task<SafenetResponse> NfsPostAsync(SafenetNfsPutFileRequest file) {
 			var body = new ByteArrayContent(file.Bytes);
 			body.Headers.ContentType = file.ContentType;
 			body.Headers.Add("Metadata", Convert.ToBase64String(file.Metadata));
-			return EmptyResponseAsync(http.PostAsync($"/nfs/file/{file.RootPath}/{file.FilePath}", body));
+			return NfsLock(
+				file.RootPath + file.FilePath,
+				() => EmptyResponseAsync(http.PostAsync($"/nfs/file/{file.RootPath}/{file.FilePath}", body)));
+		}
+
+		static int nfsLockStamp = 0;
+		static readonly ConcurrentDictionary<string, KeyValuePair<int, ManualResetEvent>> nfsLock = new ConcurrentDictionary<string, KeyValuePair<int, ManualResetEvent>>();
+		//this abomination is only needed due to concurrency problems in the Launcher API.
+		//only one update operation can happen at a time towards nfs.
+		Task<T> NfsLock<T>(string path, Func<Task<T>> fun) {
+			var target = UrlPath.GetDirectoryName(path);
+			var id = Interlocked.Increment(ref nfsLockStamp);
+
+			return NfsLock(id, target, () => {
+				var parent = UrlPath.GetDirectoryName(target);
+				if(parent == string.Empty)
+					fun();
+				return NfsLock(id, parent, fun);
+			});
+		}
+
+		async Task<T> NfsLock<T>(int id, string key, Func<Task<T>> fun) {
+			try {
+				for(;;) {
+					var s = nfsLock.GetOrAdd(key, _ => new KeyValuePair<int, ManualResetEvent>(id, new ManualResetEvent(false)));
+					if(s.Key == id)
+						return await fun();
+					await s.Value.WaitAsync().ConfigureAwait(false);
+				}
+			} finally {
+				KeyValuePair<int,ManualResetEvent> junk;
+				nfsLock.TryRemove(key, out junk);
+				junk.Value.Set();
+			}
 		}
 
 		public Task<SafenetResponse> NfsDeleteDirectoryAsync(string rootPath, string directoryPath) =>

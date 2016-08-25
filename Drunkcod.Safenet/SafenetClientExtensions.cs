@@ -18,8 +18,8 @@ namespace Drunkcod.Safenet
 				Bytes = await ReadAllBytesAsync(sourcePath).ConfigureAwait(false),
 			});
 
-		public static bool DirectoryExists(this SafenetClient self, string rootPath, string path) =>
-			self.NfsHeadDirectoryAsync(rootPath, path).AwaitResult() == HttpStatusCode.OK;
+		public static async Task<bool> DirectoryExistsAsync(this SafenetClient self, string rootPath, string path) =>
+			await self.NfsHeadDirectoryAsync(rootPath, path) == HttpStatusCode.OK;
 
 		static async Task<byte[]> ReadAllBytesAsync(string path) {
 			using(var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 15, FileOptions.Asynchronous)) {
@@ -30,28 +30,38 @@ namespace Drunkcod.Safenet
 		}
 
 		public static Task<KeyValuePair<string, SafenetResponse>[]> UploadPathsAsync(this SafenetClient self, IEnumerable<string> sourcePaths, string rootPath, string destinationPath) {
-			var knownDirs = new ConcurrentDictionary<string,bool>();
+			var knownDirs = new ConcurrentDictionary<string,bool>(new[] { new KeyValuePair<string, bool>("", true), });
+
 			return Task.WhenAll(GetFilePaths(sourcePaths).Select(async x => {
 				var targetPath = destinationPath + "/" + x.Value;
-				knownDirs.GetOrAdd(Path.GetDirectoryName(targetPath), key => {
-					if(!self.DirectoryExists(rootPath, key))
-						self.NfsPostAsync(new SafenetNfsCreateDirectoryRequest {
-							RootPath = rootPath,
-							DirectoryPath = key,
-							IsPrivate = false,
-						}).AwaitResult();
-					return true;
-				});
+				self.EnsureDirectory(rootPath, UrlPath.GetDirectoryName(targetPath), knownDirs);
 				return new KeyValuePair<string, SafenetResponse>(x.Key, await self.UploadFileAsync(x.Key, rootPath, targetPath));
 			}));
+		}
+
+		static void EnsureDirectory(this SafenetClient self, string rootPath, string path, ConcurrentDictionary<string,bool> knownDirs) {
+			knownDirs.GetOrAdd(path, key => {
+				if (self.DirectoryExists(rootPath, key))
+					return true;
+				self.EnsureDirectory(rootPath, UrlPath.GetDirectoryName(key), knownDirs);
+				self.NfsPostAsync(new SafenetNfsCreateDirectoryRequest {
+					RootPath = rootPath,
+					DirectoryPath = key,
+					IsPrivate = false,
+				}).EnsureSuccess();
+					return true;
+			});
 		} 
+
+		public static bool DirectoryExists(this SafenetClient self, string rootPath, string path) => 
+			self.DirectoryExistsAsync(rootPath, path).AwaitResult();
 
 		static IEnumerable<KeyValuePair<string,string>> GetFilePaths(IEnumerable<string> paths) =>
 			paths.SelectMany(x => GetFilePaths(Path.GetDirectoryName(x), x));
 
 		static IEnumerable<KeyValuePair<string, string>> GetFilePaths(string root, string item) {
 			if (File.Exists(item))
-				yield return new KeyValuePair<string, string>(item, item.Substring(1 + root.Length));
+				yield return new KeyValuePair<string, string>(item, item.Substring(1 + root.Length).Replace(Path.DirectorySeparatorChar, '/'));
 			else
 				foreach(var x in Directory.EnumerateFileSystemEntries(item))
 				foreach(var y in GetFilePaths(root, x))

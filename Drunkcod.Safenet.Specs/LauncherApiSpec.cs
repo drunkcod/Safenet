@@ -186,7 +186,6 @@ namespace Drunkcod.Safenet.Specs
 
 			Check.That(() => safe.NfsDeleteDirectoryAsync("app", "test").Result.StatusCode == HttpStatusCode.OK);
 			Check.That(() => !safe.DirectoryExists("app", "test"));
-
 		}
 
 		public async Task nfs_get_subdirectory() {
