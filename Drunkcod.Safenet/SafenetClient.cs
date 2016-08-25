@@ -82,7 +82,7 @@ namespace Drunkcod.Safenet
 
 		public Task<SafenetResponse> NfsPostAsync(SafenetNfsCreateDirectoryRequest directory) =>
 			NfsLock(
-				directory.RootPath + directory.DirectoryPath,
+				directory.RootPath + "/" + directory.DirectoryPath,
 				() => EmptyResponseAsync(http.PostAsync($"/nfs/directory/{directory.RootPath}/{directory.DirectoryPath}", ToPayload(new {
 					isPrivate = directory.IsPrivate,
 					metadata = Convert.ToBase64String(directory.Metadata),
@@ -93,7 +93,7 @@ namespace Drunkcod.Safenet
 			body.Headers.ContentType = file.ContentType;
 			body.Headers.Add("Metadata", Convert.ToBase64String(file.Metadata));
 			return NfsLock(
-				file.RootPath + file.FilePath,
+				file.RootPath + "/" + file.FilePath,
 				() => EmptyResponseAsync(http.PostAsync($"/nfs/file/{file.RootPath}/{file.FilePath}", body)));
 		}
 
@@ -107,9 +107,9 @@ namespace Drunkcod.Safenet
 
 			return NfsLock(id, target, () => {
 				var parent = UrlPath.GetDirectoryName(target);
-				if(parent == string.Empty)
-					fun();
-				return NfsLock(id, parent, fun);
+				return parent == string.Empty 
+				? fun() 
+				: NfsLock(id, parent, fun);
 			});
 		}
 

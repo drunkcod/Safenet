@@ -31,9 +31,13 @@ namespace Drunkcod.Safenet
 
 		public static Task<KeyValuePair<string, SafenetResponse>[]> UploadPathsAsync(this SafenetClient self, IEnumerable<string> sourcePaths, string rootPath, string destinationPath) {
 			var knownDirs = new ConcurrentDictionary<string,bool>(new[] { new KeyValuePair<string, bool>("", true), });
+			if(string.IsNullOrEmpty(destinationPath))
+				destinationPath = string.Empty;
+			else
+				destinationPath += "/";
 
 			return Task.WhenAll(GetFilePaths(sourcePaths).Select(async x => {
-				var targetPath = destinationPath + "/" + x.Value;
+				var targetPath = destinationPath + x.Value;
 				self.EnsureDirectory(rootPath, UrlPath.GetDirectoryName(targetPath), knownDirs);
 				return new KeyValuePair<string, SafenetResponse>(x.Key, await self.UploadFileAsync(x.Key, rootPath, targetPath));
 			}));
