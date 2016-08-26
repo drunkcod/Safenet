@@ -180,16 +180,29 @@ namespace MySafenet
 			ExplorerView.KeyDown += ExplorerView_KeyDown;
 		}
 
-		private void ExplorerView_DragDrop(object sender, DragEventArgs e) =>
-			worker.Post(UploadDroppedFiles, 
+		private void ExplorerView_DragDrop(object sender, DragEventArgs e) { 
+			var progress = new FileUploadProgressDialog();
+			progress.ActiveFile.Font = this.Font;
+			worker.Post(UploadDroppedFiles,
+				progress,
 				(ExplorerViewContext)((ListView)sender).Tag,
 				(string[])e.Data.GetData(DataFormats.FileDrop));
+			progress.ShowDialog();
+		}
 
-		void UploadDroppedFiles(ExplorerViewContext ctx, string[] paths) {
-			var uploads = safe.UploadPathsAsync(paths, ctx.RootPath, ctx.Path).AwaitResult();
+		void UploadDroppedFiles(FileUploadProgressDialog progress, ExplorerViewContext ctx, string[] paths) {
+			var uploads = safe.UploadPathsAsync(paths, ctx.RootPath, ctx.Path, (_, e) => {
+				ui.Post(obj => {
+					var p = (FileUploadProgressDialog)obj;
+					p.Progress.Maximum = e.TotalFiles;
+					p.Progress.Value = e.UploadedFiles;
+					p.ActiveFile.Text = $"{e.UploadedFiles}/{e.TotalFiles}: {e.ActiveFile}";
+				}, progress);
+			}).AwaitResult();
 			foreach(var item in uploads.Where(x => x.Value.StatusCode != HttpStatusCode.OK))
 				MessageBox.Show($"Failed to upload '{item.Key}' reason: {item.Value.Error.Value.Description}", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
 			ctx.Refresh().Wait();
+			ui.Post(_ => progress.Close(), null);
 		}
 
 		void ExplorerView_MouseDoubleClick(object sender, MouseEventArgs e) {

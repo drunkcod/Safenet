@@ -1,13 +1,28 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Drunkcod.Safenet
 {
+	public class UploadProgressEventArgs : EventArgs
+	{
+		public readonly int TotalFiles;
+		public readonly int UploadedFiles;
+		public string ActiveFile;
+
+		public UploadProgressEventArgs(string file, int total, int uploaded) {
+			this.TotalFiles = total;
+			this.UploadedFiles = uploaded;
+			this.ActiveFile = file;
+		}
+	}
+
 	public static class SafenetClientExtensions
 	{
 		public static async Task<SafenetResponse> UploadFileAsync(this SafenetClient self, string sourcePath, string rootPath, string destinationPath) =>
@@ -29,33 +44,69 @@ namespace Drunkcod.Safenet
 			}
 		}
 
-		public static Task<KeyValuePair<string, SafenetResponse>[]> UploadPathsAsync(this SafenetClient self, IEnumerable<string> sourcePaths, string rootPath, string destinationPath) {
-			var knownDirs = new ConcurrentDictionary<string,bool>(new[] { new KeyValuePair<string, bool>("", true), });
-			if(string.IsNullOrEmpty(destinationPath))
-				destinationPath = string.Empty;
-			else
-				destinationPath += "/";
+		class DirectoryUpload
+		{
+			public Task Init = Task.FromResult(0);
+			public List<KeyValuePair<string,string>> Refs = new List<KeyValuePair<string, string>>(); 
+		}
 
-			return Task.WhenAll(GetFilePaths(sourcePaths).Select(async x => {
-				var targetPath = destinationPath + x.Value;
-				self.EnsureDirectory(rootPath, UrlPath.GetDirectoryName(targetPath), knownDirs);
-				return new KeyValuePair<string, SafenetResponse>(x.Key, await self.UploadFileAsync(x.Key, rootPath, targetPath));
+		public static Task<KeyValuePair<string, SafenetResponse>[]> UploadPathsAsync(this SafenetClient self, IEnumerable<string> sourcePaths, string rootPath, string destinationPath, EventHandler<UploadProgressEventArgs> onProgress) {
+			var totals = 0;
+			var done = 0;
+			var knownDirs = new ConcurrentDictionary<string,DirectoryUpload>(new[] { new KeyValuePair<string, DirectoryUpload>("", new DirectoryUpload()) });
+
+			foreach(var x in GetFilePaths(sourcePaths)) {
+				var targetPath = UrlPath.Combine(destinationPath, x.Value);
+				
+				onProgress(null, new UploadProgressEventArgs(targetPath, Interlocked.Increment(ref totals), done));
+				var dir = self.EnsureDirectory(rootPath, UrlPath.GetDirectoryName(targetPath), knownDirs);
+				dir.Refs.Add(x);
+			}
+
+			return Task.WhenAll(GetRefs(knownDirs.Values).Select(async x => {
+				var targetPath = UrlPath.Combine(destinationPath, x.Value);
+				var r = await self.UploadFileAsync(x.Key, rootPath, targetPath);
+				onProgress(null, new UploadProgressEventArgs(targetPath, totals, Interlocked.Increment(ref done)));
+				return new KeyValuePair<string, SafenetResponse>(x.Key, r);
 			}));
 		}
 
-		static void EnsureDirectory(this SafenetClient self, string rootPath, string path, ConcurrentDictionary<string,bool> knownDirs) {
+		static IEnumerable<KeyValuePair<string,string>> GetRefs(ICollection<DirectoryUpload> uploads) {
+			var inits = new Task[uploads.Count];
+			var refs = new List<KeyValuePair<string,string>>[uploads.Count];
+			var n = 0;
+			foreach(var item in uploads) {
+				inits[n] = item.Init;
+				refs[n] = item.Refs;
+				++n;
+			}
+			while(inits.Length != 0) {
+				var done = Task.WaitAny(inits);
+				foreach(var item in refs[done])
+					yield return item;
+				var last = inits.Length - 1;
+				inits[done] = inits[last];
+				refs[done] = refs[last];
+				Array.Resize(ref inits, last);
+			}
+		}
+
+		static DirectoryUpload EnsureDirectory(this SafenetClient self, string rootPath, string path, ConcurrentDictionary<string,DirectoryUpload> knownDirs) =>
 			knownDirs.GetOrAdd(path, key => {
-				if (self.DirectoryExists(rootPath, key))
-					return true;
-				self.EnsureDirectory(rootPath, UrlPath.GetDirectoryName(key), knownDirs);
-				self.NfsPostAsync(new SafenetNfsCreateDirectoryRequest {
-					RootPath = rootPath,
-					DirectoryPath = key,
-					IsPrivate = false,
-				}).EnsureSuccess();
-					return true;
+				var parent = self.EnsureDirectory(rootPath, UrlPath.GetDirectoryName(key), knownDirs);
+				return new DirectoryUpload {
+					Init = Task.Factory.StartNew(() => {
+						parent.Init.Wait();
+						if (self.DirectoryExists(rootPath, key))
+							return;
+						self.NfsPostAsync(new SafenetNfsCreateDirectoryRequest {
+							RootPath = rootPath,
+							DirectoryPath = key,
+							IsPrivate = false,
+						}).EnsureSuccess();
+					})
+				};
 			});
-		} 
 
 		public static bool DirectoryExists(this SafenetClient self, string rootPath, string path) => 
 			self.DirectoryExistsAsync(rootPath, path).AwaitResult();

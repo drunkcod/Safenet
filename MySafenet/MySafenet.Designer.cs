@@ -25,8 +25,10 @@
 		/// the contents of this method with the code editor.
 		/// </summary>
 		private void InitializeComponent() {
+			System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MySafenet));
 			this.DnsPanel = new System.Windows.Forms.Panel();
 			this.DnsView = new System.Windows.Forms.TreeView();
+			this.DnsLabel = new System.Windows.Forms.Label();
 			this.panel1 = new System.Windows.Forms.Panel();
 			this.DnsAdd = new System.Windows.Forms.Button();
 			this.NewDnsName = new System.Windows.Forms.TextBox();
@@ -37,7 +39,6 @@
 			this.StatusStrip = new System.Windows.Forms.StatusStrip();
 			this.StatusProgress = new System.Windows.Forms.ToolStripProgressBar();
 			this.StatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
-			this.DnsLabel = new System.Windows.Forms.Label();
 			this.DnsPanel.SuspendLayout();
 			this.panel1.SuspendLayout();
 			this.StatusStrip.SuspendLayout();
@@ -66,6 +67,15 @@
 			this.DnsView.PathSeparator = ".";
 			this.DnsView.Size = new System.Drawing.Size(320, 287);
 			this.DnsView.TabIndex = 8;
+			// 
+			// DnsLabel
+			// 
+			this.DnsLabel.AutoSize = true;
+			this.DnsLabel.Location = new System.Drawing.Point(139, 22);
+			this.DnsLabel.Name = "DnsLabel";
+			this.DnsLabel.Size = new System.Drawing.Size(79, 15);
+			this.DnsLabel.TabIndex = 14;
+			this.DnsLabel.Text = "My Public IDs";
 			// 
 			// panel1
 			// 
@@ -167,15 +177,6 @@
 			this.StatusLabel.Size = new System.Drawing.Size(148, 20);
 			this.StatusLabel.Text = "Welcome to SAFE Network";
 			// 
-			// DnsLabel
-			// 
-			this.DnsLabel.AutoSize = true;
-			this.DnsLabel.Location = new System.Drawing.Point(139, 22);
-			this.DnsLabel.Name = "DnsLabel";
-			this.DnsLabel.Size = new System.Drawing.Size(79, 15);
-			this.DnsLabel.TabIndex = 14;
-			this.DnsLabel.Text = "My Public IDs";
-			// 
 			// MySafenet
 			// 
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
@@ -189,6 +190,7 @@
 			this.Controls.Add(this.DnsPanel);
 			this.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
 			this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
+			this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
 			this.Name = "MySafenet";
 			this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Show;
 			this.Text = "MySafenet";
