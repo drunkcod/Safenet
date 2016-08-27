@@ -1,0 +1,14 @@
+/* latin-ext */
+@font-face {
+  font-family: 'Concert One';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Concert One'), local('ConcertOne-Regular'), url('Fonts/Concert_One/ConcertOne-Regular.ttf') format('woff2');
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Work Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Work Sans'), local('WorkSans-Regular'), url('Fonts/Work_Sans/WorkSans-Regular.ttf') format('woff2');
+}
