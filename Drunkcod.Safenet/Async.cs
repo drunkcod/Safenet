@@ -1,11 +1,12 @@
 using System;
-using System.Runtime.Remoting.Messaging;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Drunkcod.Safenet
 {
-	static class Async
+	public static class Async
 	{
 		class ActionTaskState<T>
 		{
@@ -34,5 +35,27 @@ namespace Drunkcod.Safenet
 
 		public static Task<bool> WaitAsync(this WaitHandle self) =>
 			ToAsync(self.WaitOne);
+
+		public static IEnumerable<TResult> GetResults<TSource,TResult>(this ICollection<TSource> sources, Func<TSource,Task<TResult>> selector) {
+			var r = new Task<TResult>[sources.Count];
+			var n = 0;
+			foreach(var item in sources)
+				r[n++] = selector(item);
+
+			return GetResults(r);
+		}
+
+		public static IEnumerable<T> GetResults<T>(this IEnumerable<Task<T>> sources) =>
+			GetResults(sources.ToArray());
+
+		static IEnumerable<T> GetResults<T>(Task<T>[] r) {
+			while(r.Length != 0) {
+				var done = Task.WaitAny(r);
+				yield return r[done].AwaitResult();
+				var last = r.Length - 1;
+				r[done] = r[last];
+				Array.Resize(ref r, last);
+			}
+		} 
 	}
 }

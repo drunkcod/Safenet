@@ -37,6 +37,7 @@
 			this.Progress.Name = "Progress";
 			this.Progress.Size = new System.Drawing.Size(513, 23);
 			this.Progress.TabIndex = 0;
+			this.Progress.UseWaitCursor = true;
 			// 
 			// ActiveFile
 			// 
@@ -46,18 +47,21 @@
 			this.ActiveFile.Size = new System.Drawing.Size(35, 13);
 			this.ActiveFile.TabIndex = 1;
 			this.ActiveFile.Text = "label1";
+			this.ActiveFile.UseWaitCursor = true;
 			// 
 			// FileUploadProgressDialog
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			this.ClientSize = new System.Drawing.Size(537, 85);
+			this.ControlBox = false;
 			this.Controls.Add(this.ActiveFile);
 			this.Controls.Add(this.Progress);
 			this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
 			this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
 			this.Name = "FileUploadProgressDialog";
 			this.Text = "Uploading.";
+			this.UseWaitCursor = true;
 			this.ResumeLayout(false);
 			this.PerformLayout();
 

@@ -5,6 +5,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -27,14 +28,12 @@ namespace MySafenet
 		{
 			public Func<Task> Enter;
 			public Func<Task> Delete;
+			public Func<string, Task> Download; 
 		}
 
 		readonly SafenetClient safe = new SafenetClient();
 		readonly SynchronizationContext ui;
 		readonly ThreadPoolWorker worker;
-
-		ContextMenu dnsActions;
-		ContextMenu serviceActions;
 
 		public MySafenet() {
 			InitializeComponent();
@@ -90,6 +89,7 @@ namespace MySafenet
 		}
 
 		private void MySafenet_Load(object sender, EventArgs e) {
+			Text = Text + " v" + GetType().Assembly.GetName().Version.ToString(4);
 			Font = SystemFonts.DefaultFont;
 			WelcomeLabel.Font = new Font(SystemFonts.DefaultFont.FontFamily, 16, FontStyle.Bold);
 			Center(WelcomeLabel);
@@ -105,27 +105,7 @@ namespace MySafenet
 
 			Center(WelcomeText);
 
-			dnsActions = new ContextMenu(new [] {
-				new MenuItem("Delete", DnsActions_Delete),
-				new MenuItem("Add Service", DnsActions_AddService)
-			});
-
-			serviceActions = new ContextMenu(new [] {
-				new MenuItem("Delete", ServiceActions_Delete),
-			});
-
-			DnsView.NodeMouseClick += (s, args) => {
-				if(args.Button != MouseButtons.Right)
-					return;
-				if(args.Node.Level == 0) { 
-					dnsActions.Tag = args.Node;
-					dnsActions.Show((Control)s, args.Location);
-				} else {
-					serviceActions.Tag = args.Node;
-					serviceActions.Show((Control)s, args.Location);
-				}
-			};
-
+			ConfigureDnsView();
 			ConfigureExplorerView();
 			worker.Post(RunSteps, new [] {
 				Step("Requesting authorization...", RequestAuthorization), 
@@ -154,6 +134,29 @@ namespace MySafenet
 			ui.Post(_ => StatusLabel.Text = "Ready.", null);
 		} 
 
+		void ConfigureDnsView() {
+			var dnsActions = new ContextMenu(new[] {
+				new MenuItem("Delete", DnsActions_Delete),
+				new MenuItem("Add Service", DnsActions_AddService)
+			});
+
+			var serviceActions = new ContextMenu(new[] {
+				new MenuItem("Delete", ServiceActions_Delete),
+			});
+
+			DnsView.NodeMouseClick += (s, args) => {
+				if (args.Button != MouseButtons.Right)
+					return;
+				if (args.Node.Level == 0) {
+					dnsActions.Tag = args.Node;
+					dnsActions.Show((Control) s, args.Location);
+				} else {
+					serviceActions.Tag = args.Node;
+					serviceActions.Show((Control) s, args.Location);
+				}
+			};
+		}
+
 		void ConfigureExplorerView() {
 			var explorerImages = new ImageList();
 			explorerImages.ColorDepth = ColorDepth.Depth32Bit;
@@ -178,9 +181,21 @@ namespace MySafenet
 
 			ExplorerView.MouseDoubleClick += ExplorerView_MouseDoubleClick;
 			ExplorerView.KeyDown += ExplorerView_KeyDown;
+
+			var explorerActions = new ContextMenu(new [] {
+				new MenuItem("Download", ExplorerView_Download), 
+			});
+
+			ExplorerView.MouseClick += (s, args) => {
+				var view = (ListView)s;
+				if(args.Button != MouseButtons.Right || view.SelectedItems.Count == 0)
+					return;
+				explorerActions.Tag = view.SelectedItems.Cast<ListViewItem>().Select(x => x.Tag).Cast<ExplorerViewItem>();
+				explorerActions.Show(view, args.Location);
+			};
 		}
 
-		private void ExplorerView_DragDrop(object sender, DragEventArgs e) { 
+		void ExplorerView_DragDrop(object sender, DragEventArgs e) { 
 			var progress = new FileUploadProgressDialog();
 			progress.ActiveFile.Font = this.Font;
 			worker.Post(UploadDroppedFiles,
@@ -198,7 +213,7 @@ namespace MySafenet
 					p.Progress.Value = e.UploadedFiles;
 					p.ActiveFile.Text = $"{e.UploadedFiles}/{e.TotalFiles}: {e.ActiveFile}";
 				}, progress);
-			}).AwaitResult();
+			}).GetResults();
 			foreach(var item in uploads.Where(x => x.Value.StatusCode != HttpStatusCode.OK))
 				MessageBox.Show($"Failed to upload '{item.Key}' reason: {item.Value.Error.Value.Description}", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
 			ctx.Refresh().Wait();
@@ -228,6 +243,17 @@ namespace MySafenet
 					e.Handled = DeleteSelected(view);
 					break;
 			}
+		}
+
+		void ExplorerView_Download(object sender, EventArgs e) {
+			var destination = new FolderBrowserDialog();
+			if(destination.ShowDialog() != DialogResult.OK)
+				return;
+			var m = (MenuItem)sender;
+			worker.Post(downloads => {
+				foreach(var item in downloads)
+					item.AwaitResult();
+			}, (m.Parent.Tag as IEnumerable<ExplorerViewItem>).Select(x => x.Download(destination.SelectedPath)).ToArray());
 		}
 
 		bool ActivateSelected(ListView sender) {
@@ -264,7 +290,7 @@ namespace MySafenet
 					Id = "drunckod.mysafenet",
 					Name = "MySafenet",
 					Vendor = "drunkcod",
-					Version = "0.0.1"
+					Version = GetType().Assembly.GetName().Version.ToString(4),
 				},
 			});
 			if(getToken.StatusCode != HttpStatusCode.OK)
@@ -321,11 +347,23 @@ namespace MySafenet
 			var dirs = Array.ConvertAll(getDirectory.Response.SubDirectories, x =>
 				MakeViewItem(x, 1, new ExplorerViewItem {
 					Enter = () => LoadDirectoryInfo(root, path + "/" + x.Name),
-					Delete = () => safe.NfsDeleteDirectoryAsync(root, path + "/" + x.Name)
+					Delete = () => safe.NfsDeleteDirectoryAsync(root, path + "/" + x.Name),
+					Download = async downloadPath => {
+						foreach(var item in safe.DownloadDirectoryAsync(root, UrlPath.Combine(path, x.Name), downloadPath).ToList()) { 
+							var r = await item;
+							if(r.Value.StatusCode != HttpStatusCode.OK)
+								MessageBox.Show($"Failed to download {r.Key} - {r.Value.Error.Value.Description}", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+						}
+					}
 				}));
 			var files = Array.ConvertAll(getDirectory.Response.Files, x => 
 				MakeViewItem(x, new ExplorerViewItem {
-					Delete = () => safe.NfsDeleteFileAsync(root, path + "/" + x.Name),
+					Delete = () => safe.NfsDeleteFileAsync(root, UrlPath.Combine(path, x.Name)),
+					Download = async downloadPath => {
+						var r = await safe.DownloadFileAsyn(root, UrlPath.Combine(path, x.Name), Path.Combine(downloadPath, x.Name));
+						if(r.StatusCode != HttpStatusCode.OK)
+							MessageBox.Show($"Failed to download {x.Name} - {r.Error.Value.Description}", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+					}
 				}));
 			ui.Post(obj => {
 				var ctx = (ExplorerViewContext)ExplorerView.Tag;
@@ -365,13 +403,17 @@ namespace MySafenet
 			DnsView.Nodes.Add(NewDnsName.Text);
 		}
 
-		private void CenterChildControls(object sender, EventArgs e) {
+		void CenterChildControls(object sender, EventArgs e) {
 			var c = (Control)sender;
 			foreach(Control item in c.Controls)
 				Center(item);
 		}
 
-		private static void Center(Control item) =>
+		static void Center(Control item) =>
 			item.Left = (item.Parent.ClientSize.Width - item.Width) / 2;
+
+		static T GetAttribute<T>() where T : Attribute =>
+			(T)typeof(Program).Assembly.GetCustomAttribute(typeof(T));
+
 	}
 }
