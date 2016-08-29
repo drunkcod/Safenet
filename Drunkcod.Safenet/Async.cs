@@ -6,6 +6,11 @@ using System.Threading.Tasks;
 
 namespace Drunkcod.Safenet
 {
+	public static class KeyValuePair
+	{
+		public static KeyValuePair<TKey,TValue> From<TKey,TValue>(TKey key, TValue value) => new KeyValuePair<TKey,TValue>(key, value); 
+	}
+
 	public static class Async
 	{
 		class ActionTaskState<T>

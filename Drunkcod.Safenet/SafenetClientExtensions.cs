@@ -67,20 +67,19 @@ namespace Drunkcod.Safenet
 			}
 		}
 
-		public static IEnumerable<Task<KeyValuePair<string, SafenetResponse>>> DownloadDirectoryAsync(this SafenetClient self, string rootPath, string path, string targetPath) {
+		public static IEnumerable<KeyValuePair<string, Task<SafenetResponse>>> DownloadDirectoryAsync(this SafenetClient self, string rootPath, string path, string targetPath) {
 			var q = new Queue<KeyValuePair<string, string>>();
-			q.Enqueue(new KeyValuePair<string, string>(path, targetPath));
+			q.Enqueue(KeyValuePair.From(path, targetPath));
 			while(q.Count != 0) {
 				var c = q.Dequeue();
 				Directory.CreateDirectory(c.Value);
 				var r = self.NfsGetDirectoryAsync(rootPath, c.Key).AwaitResult();
 				foreach(var file in r.Response.Files) {
 					var sourcePath = UrlPath.Combine(c.Key, file.Name);
-					yield return self.DownloadFileAsyn(rootPath, sourcePath, Path.Combine(c.Value, file.Name)).ContinueWith(x =>
-						new KeyValuePair<string, SafenetResponse>(sourcePath, x.Result));
+					yield return KeyValuePair.From(sourcePath, self.DownloadFileAsyn(rootPath, sourcePath, Path.Combine(c.Value, file.Name)));
 				}
 				foreach(var child in r.Response.SubDirectories)
-					q.Enqueue(new KeyValuePair<string, string>(UrlPath.Combine(c.Key, child.Name), Path.Combine(c.Value, child.Name)));
+					q.Enqueue(KeyValuePair.From(UrlPath.Combine(c.Key, child.Name), Path.Combine(c.Value, child.Name)));
 			}
 		}
 

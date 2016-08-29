@@ -28,7 +28,7 @@ namespace MySafenet
 		{
 			public Func<Task> Enter;
 			public Func<Task> Delete;
-			public Func<string, Task> Download; 
+			public Func<string, IEnumerable<KeyValuePair<string, Task<SafenetResponse>>>> Download; 
 		}
 
 		readonly SafenetClient safe = new SafenetClient();
@@ -89,7 +89,7 @@ namespace MySafenet
 		}
 
 		private void MySafenet_Load(object sender, EventArgs e) {
-			Text = Text + " v" + GetType().Assembly.GetName().Version.ToString(4);
+			Text = Text + " v" + Version;
 			Font = SystemFonts.DefaultFont;
 			WelcomeLabel.Font = new Font(SystemFonts.DefaultFont.FontFamily, 16, FontStyle.Bold);
 			Center(WelcomeLabel);
@@ -250,10 +250,30 @@ namespace MySafenet
 			if(destination.ShowDialog() != DialogResult.OK)
 				return;
 			var m = (MenuItem)sender;
+			var progress = new FileUploadProgressDialog();
+			progress.Text = "Downloading.";
+			progress.ActiveFile.Text = "Preparing download.";
 			worker.Post(downloads => {
-				foreach(var item in downloads)
-					item.AwaitResult();
+				var items = new List<Task<SafenetResponse>>();
+				foreach(var item in downloads.SelectMany(x => x)) { 
+					items.Add(item.Value.ContinueWith(x => {
+						ui.Post(_ => {
+							progress.Progress.PerformStep();
+							progress.ActiveFile.Text = $"{progress.Progress.Value}/{progress.Progress.Maximum} {item.Key}";
+						}, null);
+						return x.Result;
+					}));
+					ui.Post(max => {
+						progress.Progress.Maximum = (int)max;
+						progress.ActiveFile.Text = $"{progress.Progress.Value}/{progress.Progress.Maximum} {item.Key}";
+					}, items.Count);
+				}
+
+				items.ForEach(x => x.AwaitResult());
+				ui.Post(_ => progress.Close(), null);
+
 			}, (m.Parent.Tag as IEnumerable<ExplorerViewItem>).Select(x => x.Download(destination.SelectedPath)).ToArray());
+			progress.ShowDialog();
 		}
 
 		bool ActivateSelected(ListView sender) {
@@ -290,13 +310,15 @@ namespace MySafenet
 					Id = "drunckod.mysafenet",
 					Name = "MySafenet",
 					Vendor = "drunkcod",
-					Version = GetType().Assembly.GetName().Version.ToString(4),
+					Version = Version,
 				},
 			});
 			if(getToken.StatusCode != HttpStatusCode.OK)
 				throw new Exception("Failed to get authorization.");
 			safe.SetToken(getToken.Response.Token);
 		}
+
+		string Version => GetType().Assembly.GetName().Version.ToString(4); 
 
 		async Task LoadDnsInfo() {
 			var getDns = await safe.DnsGetAsync();
@@ -348,21 +370,17 @@ namespace MySafenet
 				MakeViewItem(x, 1, new ExplorerViewItem {
 					Enter = () => LoadDirectoryInfo(root, path + "/" + x.Name),
 					Delete = () => safe.NfsDeleteDirectoryAsync(root, path + "/" + x.Name),
-					Download = async downloadPath => {
-						foreach(var item in safe.DownloadDirectoryAsync(root, UrlPath.Combine(path, x.Name), downloadPath).ToList()) { 
-							var r = await item;
-							if(r.Value.StatusCode != HttpStatusCode.OK)
-								MessageBox.Show($"Failed to download {r.Key} - {r.Value.Error.Value.Description}", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
-						}
-					}
+					Download = downloadPath => safe.DownloadDirectoryAsync(root, UrlPath.Combine(path, x.Name), downloadPath),
 				}));
 			var files = Array.ConvertAll(getDirectory.Response.Files, x => 
 				MakeViewItem(x, new ExplorerViewItem {
 					Delete = () => safe.NfsDeleteFileAsync(root, UrlPath.Combine(path, x.Name)),
-					Download = async downloadPath => {
-						var r = await safe.DownloadFileAsyn(root, UrlPath.Combine(path, x.Name), Path.Combine(downloadPath, x.Name));
-						if(r.StatusCode != HttpStatusCode.OK)
-							MessageBox.Show($"Failed to download {x.Name} - {r.Error.Value.Description}", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+					Download = downloadPath => {
+						var sourcePath = UrlPath.Combine(path, x.Name);
+						return new [] { KeyValuePair.From(
+							sourcePath, 
+							safe.DownloadFileAsyn(root, sourcePath, Path.Combine(downloadPath, x.Name)))
+						};
 					}
 				}));
 			ui.Post(obj => {
